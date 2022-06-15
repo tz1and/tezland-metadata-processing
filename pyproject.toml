@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "metadata-processing"
+version = "0.1.0"
+description = ""
+authors = ["852Kerfunkle <852Kerfunkle@users.noreply.github.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+tortoise-orm = "0.19.1"
+asyncpg = "^0.25.0"
+aiohttp = "^3.8.1"
+orjson = "^3.7.2"
+pygltflib = "^1.15.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+my-script = "metadata_processing.daemon:main"

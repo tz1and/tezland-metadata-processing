@@ -1,0 +1,9 @@
+# ignore pycache
+__pycache__
+# ignore sqlite files
+*.sqlite3*
+# ignore .env file
+.env*
+
+# notes and stuff
+TODO.txt
