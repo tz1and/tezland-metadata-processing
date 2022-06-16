@@ -1,7 +1,7 @@
 EXTRA_ARGS?=
 
 run:
-	source .venv/bin/activate && poetry run metadata-processing
+	source .venv/bin/activate && poetry run metadata-processing --env development
 
 # Dev
 DOCKER_DEV_CONF?=-f docker-compose.metadata-processing.yml -f docker-compose.metadata-processing.dev.yml

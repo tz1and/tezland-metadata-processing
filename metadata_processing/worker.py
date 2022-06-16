@@ -25,9 +25,9 @@ class TokenType(Enum):
     Place = 1
 
 class MetadataProcessing:
-    def __init__(self) -> None:
+    def __init__(self, config: Config) -> None:
         self._logger = logging.getLogger(f'MetadataProcessing')
-        self._config = Config()
+        self._config = config
         self._user_agent = None
         self._session = None
 
@@ -124,6 +124,14 @@ class MetadataProcessing:
         self._logger.info(f'Processing Place token {token_id}...')
         place_token = await PlaceToken.get(id=token_id)
 
+        # If we already have the metadata processed, use that.
+        place_token_metadata = await PlaceTokenMetadata.filter(id=token_id).first()
+        if place_token_metadata:
+            place_token.metadata_status = MetadataStatus.Valid.value
+            place_token.metadata = place_token_metadata
+            await place_token.save()
+            return
+
         # to catch unspecified errors and mark token as failed.
         try:
             metadata, metadata_size = await self.ipfs_download_retry(place_token.metadata_uri)
@@ -163,11 +171,11 @@ class MetadataProcessing:
                     level=place_token.level,
                     timestamp=place_token.timestamp)
 
-                if await PlaceTokenMetadata.exists(id=place_token.id):
-                    self._logger.debug(f'metadata for token_id={token_id} exists, updating')
-                    await place_token_metadata.save(force_update=True)
-                else:
-                    await place_token_metadata.save()
+                #if await PlaceTokenMetadata.exists(id=place_token.id):
+                #    self._logger.debug(f'metadata for token_id={token_id} exists, updating')
+                #    await place_token_metadata.save(force_update=True)
+                #else:
+                await place_token_metadata.save()
 
                 place_token.metadata_status = MetadataStatus.Valid.value
                 place_token.metadata = place_token_metadata
@@ -186,6 +194,14 @@ class MetadataProcessing:
     async def process_item_token(self, token_id: int):
         self._logger.info(f'Processing Item token {token_id}...')
         item_token = await ItemToken.get(id=token_id)
+
+        # If we already have the metadata processed, use that.
+        item_token_metadata = await ItemTokenMetadata.filter(id=token_id).first()
+        if item_token_metadata:
+            item_token.metadata_status = MetadataStatus.Valid.value
+            item_token.metadata = item_token_metadata
+            await item_token.save()
+            return
 
         # to catch unspecified errors and mark token as failed.
         try:
@@ -273,14 +289,14 @@ class MetadataProcessing:
                     level=item_token.level,
                     timestamp=item_token.timestamp)
 
-                if await ItemTokenMetadata.exists(id=item_token.id):
-                    self._logger.debug(f'metadata for token_id={token_id} exists, updating')
-                    await item_token_metadata.save(force_update=True)
-
-                    # delete tag map if it's an update.
-                    await ItemTagMap.filter(item_metadata=item_token_metadata.id).delete()
-                else:
-                    await item_token_metadata.save()
+                #if await ItemTokenMetadata.exists(id=item_token.id):
+                #    self._logger.debug(f'metadata for token_id={token_id} exists, updating')
+                #    await item_token_metadata.save(force_update=True)
+                #
+                #    # delete tag map if it's an update.
+                #    await ItemTagMap.filter(item_metadata=item_token_metadata.id).delete()
+                #else:
+                await item_token_metadata.save()
 
                 item_token.metadata_status = MetadataStatus.Valid.value
                 item_token.metadata = item_token_metadata

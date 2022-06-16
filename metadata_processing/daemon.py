@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import argparse
 from signal import SIGINT, SIGTERM
 
 from tortoise import Tortoise, connections
@@ -33,16 +34,14 @@ async def wait_for_database_online(config: Config):
             await asyncio.sleep(10)
 
 
-async def token_processing_task():
-    config = Config()
-
+async def token_processing_task(config: Config):
     item_cursor = Cursor(ItemToken)
     place_cursor = Cursor(PlaceToken)
 
     try:
         await wait_for_database_online(config)
 
-        processing = MetadataProcessing()
+        processing = MetadataProcessing(config)
         await processing.init()
 
         task_pool = TaskPool(config.processing_workers)
@@ -84,8 +83,14 @@ async def token_processing_task():
 def main():
     logging.basicConfig(level=logging.INFO, style="$")
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-e', '--env', help='The environment. production | staging | development.', type=str, default='staging')
+    args = parser.parse_args()
+
+    config = Config(args.env)
+
     loop = asyncio.get_event_loop()
-    main_task = asyncio.ensure_future(token_processing_task())
+    main_task = asyncio.ensure_future(token_processing_task(config))
     
     for signal in [SIGINT, SIGTERM]:
         loop.add_signal_handler(signal, main_task.cancel)
