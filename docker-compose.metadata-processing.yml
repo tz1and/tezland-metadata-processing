@@ -1,0 +1,21 @@
+version: "3.7"
+
+services:
+  tezland-metadata-processing:
+    container_name: tezland-metadata-processing
+    image: tezland/metadata-processing:$TAG
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # in theory depends on db-dipdup, but also not really
+    #depends_on:
+    #  db-dipdup:
+    #    condition: service_healthy
+    restart: always
+
+#volumes:
+#  db-dipdup:
+
+networks:
+  default:
+    name: tz1and_prod

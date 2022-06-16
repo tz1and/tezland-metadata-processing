@@ -1,0 +1,22 @@
+# ignore various standard-ish
+.dockerignore
+Dockerfile
+Dockerfile.prod
+docker-compose.*
+Makefile
+.git/
+
+# ignore project specific
+.venv/
+tests/
+poetry.toml
+**/__pycache__
+**.pyc
+
+# env files
+.env*
+!.env.production.local
+
+# notes and stuff
+TODO.txt
+README.md
