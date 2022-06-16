@@ -7,7 +7,8 @@ class Config:
         'https://ipfs.io',
         'https://cloudflare-ipfs.com',
         'https://nftstorage.link',
-        'https://infura-ipfs.io'
+        'https://infura-ipfs.io',
+        #'http://backend-ipfs:8080'
     ]
 
     ipfs_fallback_gateway = 'http://backend-ipfs:8080'

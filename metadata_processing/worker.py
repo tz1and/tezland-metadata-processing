@@ -139,6 +139,7 @@ class MetadataProcessing:
                 place_type = getOrRaise(metadata, 'placeType')
                 border_coordinates = getOrRaise(metadata, 'borderCoordinates')
                 center_coordinates: list[float] = getOrRaise(metadata, 'centerCoordinates')
+                build_height = getOrRaise(metadata, 'buildHeight')
                 grid_hash = getGridCellHash(center_coordinates[0], center_coordinates[1], center_coordinates[2], self._config.grid_size)
             except:
                 place_token.metadata_status = MetadataStatus.Invalid.value
@@ -153,8 +154,9 @@ class MetadataProcessing:
                 place_token_metadata = PlaceTokenMetadata(
                     id=place_token.id,
                     name=metadata.get('name', ''),
-                    desciption=metadata.get('desciption', ''),
+                    description=metadata.get('description', ''),
                     place_type=place_type,
+                    build_height=build_height,
                     center_coordinates=center_coordinates,
                     border_coordinates=border_coordinates,
                     grid_hash=grid_hash,
@@ -260,7 +262,7 @@ class MetadataProcessing:
                 item_token_metadata = ItemTokenMetadata(
                     id=item_token.id,
                     name=metadata.get('name', ''),
-                    desciption=metadata.get('desciption', ''),
+                    description=metadata.get('description', ''),
                     artifact_uri=artifact_uri,
                     thumbnail_uri=metadata.get('thumbnailUri'),
                     display_uri=metadata.get('displayUri'),
