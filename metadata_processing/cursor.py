@@ -14,7 +14,7 @@ class Cursor:
     async def next(self) -> Model:
         if self.current is None:
             next = await self.model_class.filter(
-                id__gt=0,
+                id__gte=0,
                 #id__lt=20,
                 metadata_status=MetadataStatus.New.value
             ).order_by('id').first()
