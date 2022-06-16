@@ -125,7 +125,6 @@ class MetadataProcessing:
         place_token = await PlaceToken.get(id=token_id)
 
         # to catch unspecified errors and mark token as failed.
-        # TODO: rethink failiures. sometimes transactions fail and it should probably be retried.
         try:
             metadata, metadata_size = await self.ipfs_download_retry(place_token.metadata_uri)
 
@@ -148,9 +147,8 @@ class MetadataProcessing:
 
             # from here on, everything should be a transaction
             async with tortoise.transactions.in_transaction():
-                ## refersh token from db
-                # TODO: figure out why I wanted to do that.
-                #await place_token.refresh_from_db()
+                # refresh from DB in case the thing has been deleted.
+                await place_token.refresh_from_db()
 
                 place_token_metadata = PlaceTokenMetadata(
                     id=place_token.id,
@@ -188,7 +186,6 @@ class MetadataProcessing:
         item_token = await ItemToken.get(id=token_id)
 
         # to catch unspecified errors and mark token as failed.
-        # TODO: rethink failiures. sometimes transactions fail and it should probably be retried.
         try:
             metadata, metadata_size = await self.ipfs_download_retry(item_token.metadata_uri)
 
@@ -215,8 +212,14 @@ class MetadataProcessing:
                 # make sure formats included artifact
                 assert mime_type is not None, "Format didn't include artifact"
 
-                tags: list[str] = getOrRaise(metadata, 'tags')
-                # TODO: if tags contain no semicolons but contain commas split them by comma.
+                # Split tags by comma as well. Because people are people...
+                metadata_tags: list[str] = getOrRaise(metadata, 'tags')
+                tags: list[str] = []
+                for tag in metadata_tags:
+                    for split in tag.split(','):
+                        stripped = split.strip()
+                        if len(stripped) > 0:
+                            tags.append(stripped.lower())
             except:
                 item_token.metadata_status = MetadataStatus.Invalid.value
                 await item_token.save()
@@ -251,9 +254,8 @@ class MetadataProcessing:
 
             # from here on, everything should be a transaction
             async with tortoise.transactions.in_transaction():
-                ## refersh token from db
-                # TODO: figure out why I wanted to do that.
-                #await item_token.refresh_from_db()
+                # refresh from DB in case the thing has been deleted.
+                await item_token.refresh_from_db()
 
                 item_token_metadata = ItemTokenMetadata(
                     id=item_token.id,
