@@ -14,6 +14,8 @@ class Config:
 
     processing_workers = 8
 
+    download_retries = 8
+
     grid_size = 100.0 # default 100
 
     polygon_count_error = 500.0 # default 500

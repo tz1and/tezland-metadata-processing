@@ -31,14 +31,9 @@ class MetadataStatus(Enum):
     Failed = 2
     Invalid = 3
 
-class BaseToken(Model):
-    id = fields.BigIntField(pk=True)
-
+class BaseToken(LevelledBase):
     metadata_uri = fields.TextField(null=False)
     metadata_status = fields.BigIntField(default=int(MetadataStatus.New.value))
-
-    level = fields.BigIntField(null=False)
-    timestamp = fields.DatetimeField(null=False)
 
     class Meta:
         abstract = True
@@ -62,14 +57,9 @@ class PlaceToken(BaseToken):
         table = 'place_token'
 
 # Metadata
-class BaseMetadata(Model):
-    id = fields.BigIntField(pk=True)
-
+class BaseMetadata(LevelledBase):
     name = fields.TextField(default='')
     description = fields.TextField(default='')
-
-    level = fields.BigIntField(null=False)
-    timestamp = fields.DatetimeField(null=False)
 
     class Meta:
         abstract = True
@@ -113,8 +103,7 @@ class PlaceTokenHolder(Model):
         table = 'place_token_holder'
 
 # Auctions
-class DutchAuction(Model):
-    id = fields.BigIntField(pk=True)
+class DutchAuction(LevelledBase):
     token_id = fields.BigIntField(index=True)
     owner = fields.ForeignKeyField('models.Holder', 'created_dutch_auctions', index=True)
     start_time = fields.DatetimeField(null=False)
@@ -127,9 +116,6 @@ class DutchAuction(Model):
     finished = fields.BooleanField(default=False)
     finishing_bid = fields.BigIntField(null=True)
     bid_op_hash = fields.TextField(null=True)
-
-    level = fields.BigIntField(null=False)
-    timestamp = fields.DatetimeField(null=False)
 
     class Meta:
         table = 'dutch_auction'

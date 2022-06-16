@@ -100,7 +100,7 @@ class MetadataProcessing:
     async def ipfs_download_retry(self, ipfs_uri: str):
         attempt = 1
         sleep_time = 10
-        backoff_factor = 1.2
+        backoff_factor = 1.5
 
         while True:
             try:
@@ -109,7 +109,7 @@ class MetadataProcessing:
                 raise e
             except:
                 # terminate loop if out of retries.
-                if attempt >= 8:
+                if attempt >= self._config.download_retries:
                     break
 
                 self._logger.info(f'Backoff: sleeping for {sleep_time}s')
