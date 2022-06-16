@@ -12,6 +12,8 @@ services:
     #  db-dipdup:
     #    condition: service_healthy
     restart: always
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
 
 #volumes:
 #  db-dipdup:
