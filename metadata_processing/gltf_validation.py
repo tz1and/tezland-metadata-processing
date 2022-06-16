@@ -8,10 +8,10 @@ _logger = logging.getLogger('gltf_validation')
 
 def count_gltf_polygons(file) -> int:
     if isinstance(file, bytes):
-        #_logger.info("GLTF file is binary")
+        _logger.debug("GLTF file is binary")
         doc = GLTF2().load_from_bytes(file)
     else:
-        #_logger.info("GLTF file is json")
+        _logger.debug("GLTF file is json")
         user_encode_data = orjson.dumps(file)
         doc = GLTF2().gltf_from_json(user_encode_data)
 
@@ -59,6 +59,6 @@ def count_gltf_polygons(file) -> int:
         node = doc.nodes[n]
         totalPolyCount += traverseNodesCountPolygons(node, doc)
 
-    #_logger.info(f'polycount: {totalPolyCount}')
+    _logger.debug(f'polycount: {totalPolyCount}')
 
     return totalPolyCount

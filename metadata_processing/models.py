@@ -156,8 +156,8 @@ class Tag(LevelledBase):
         table = 'tag'
 
 class ItemTagMap(LevelledBase):
-    item_token = fields.ForeignKeyField('models.ItemToken', 'tags', index=True)
-    tag = fields.ForeignKeyField('models.Tag', 'items', index=True)
+    item_metadata = fields.ForeignKeyField('models.ItemTokenMetadata', 'tag_map', index=True)
+    tag = fields.ForeignKeyField('models.Tag', 'tag_map', index=True)
 
     class Meta:
         table = 'item_tag_map'
