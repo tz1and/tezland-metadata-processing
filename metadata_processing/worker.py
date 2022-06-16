@@ -308,8 +308,6 @@ class MetadataProcessing:
 
 
     async def process_token(self, token: tuple[TokenType, int]):
-        #self.init()
-
         try:
             token_type = token[0]
             token_id = token[1]
@@ -325,13 +323,7 @@ class MetadataProcessing:
         except Exception as e:
             self._logger.error(f'Failed to process token: {e}')
 
-        # Clean up
-        #self.shutdown()
-
     async def init(self):
-        # Here we create a SQLite DB using file "db.sqlite3"
-        #  also specify the app name of "models"
-        #  which contain models from "app.models"
         #await Tortoise.init(
         #    db_url=self._config.db_connection_url,
         #    modules={'models': ['metadata_processing.models']}
