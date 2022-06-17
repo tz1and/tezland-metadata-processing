@@ -64,8 +64,7 @@ class MetadataProcessing:
             method='GET',
             url=gateway_link,
             headers=headers,
-            raise_for_status=True,
-            #**kwargs,
+            raise_for_status=True
         ) as response:
             # Pretty sure we don't need to check this.
             #if not (response.status >= 200 and response.status <= 299):
@@ -350,7 +349,10 @@ class MetadataProcessing:
         self._session=aiohttp.ClientSession(
             json_serialize=lambda *a, **kw: orjson.dumps(*a, **kw).decode(),
             connector=aiohttp.TCPConnector(limit=100),
-            timeout=aiohttp.ClientTimeout(connect=60),
+            timeout=aiohttp.ClientTimeout(
+                total=None,
+                sock_connect=self._config.http_timeout_seconds,
+                sock_read=self._config.http_timeout_seconds)
         )
 
     async def shutdown(self):
