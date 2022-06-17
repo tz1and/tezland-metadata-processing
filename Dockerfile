@@ -20,4 +20,5 @@ RUN poetry config virtualenvs.create false && poetry install --no-dev
 
 COPY ./ ./
 
-ENTRYPOINT ["poetry", "run", "metadata-processing"]
+# Wait a minute before startup
+ENTRYPOINT ["/bin/sh", "-c" , "sleep 60 && poetry run metadata-processing"]
