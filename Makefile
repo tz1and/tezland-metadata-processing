@@ -50,7 +50,7 @@ docker-down:
 
 docker-push:
 	docker save -o tezland-metadata-processing-latest.tar tezland/metadata-processing:latest
-	rsync tezland-metadata-processing-latest.tar tezland-metadata-latest.tar docker-compose.metadata-processing.yml tz1and.com:/home/yves/docker
-	ssh tz1and.com "source .profile; cd docker; docker load -i tezland-metadata-processing-latest.tar; docker load -i tezland-metadata-latest.tar"
+	rsync tezland-metadata-processing-latest.tar docker-compose.metadata-processing.yml tz1and.com:/home/yves/docker
+	ssh tz1and.com "source .profile; cd docker; docker load -i tezland-metadata-processing-latest.tar"
 #	; rm tezland-metadata-processing-latest.tar"
 	rm tezland-metadata-processing-latest.tar
