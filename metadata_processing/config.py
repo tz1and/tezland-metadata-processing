@@ -10,7 +10,7 @@ class Config:
         _logger.info(f'Environment: {env}')
         self.env = env
 
-        db_password = environ.get('POSTGRES_PASSWORD', 'thereisnodefault')
+        db_password = environ.get('POSTGRES_PASSWORD', 'changeme')
 
         if self.env == 'production':
             self.db_connection_url = f'postgres://dipdup:{db_password}@db-dipdup:15435/dipdup'
