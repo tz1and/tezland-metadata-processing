@@ -5,7 +5,7 @@ from datetime import datetime
 from metadata_processing.config import Config
 
 from metadata_processing.worker import MetadataProcessing, TokenType
-from metadata_processing.models import ItemToken, Holder, PlaceToken
+from metadata_processing.models import ItemToken, Holder, ItemTokenMetadata, MetadataStatus, PlaceToken, PlaceTokenMetadata
 
 
 class TestMetadataProcessing(test.TestCase):
@@ -70,49 +70,53 @@ class TestMetadataProcessing(test.TestCase):
         await create_place(4, not_metadata)
 
 
-    @test.expectedFailure
     async def test_invalid_item_metadata_link(self):
         """Test invalid item metadata link"""
-        await self.processing.process_token((TokenType.Item, 1))
+        with self.assertRaises(Exception):
+            await self.processing.process_token((TokenType.Item, 1))
+        self.assertEqual((await ItemToken.get(id=1)).metadata_status, MetadataStatus.Failed.value)
 
 
-    @test.expectedFailure
     async def test_invalid_place_metadata_link(self):
         """Test invalid place metadata link"""
-        await self.processing.process_token((TokenType.Place, 1))
+        with self.assertRaises(Exception):
+            await self.processing.process_token((TokenType.Place, 1))
+        self.assertEqual((await PlaceToken.get(id=1)).metadata_status, MetadataStatus.Failed.value)
 
 
     async def test_valid_item_metadata(self):
         """Test valid item metadata"""
         await self.processing.process_token((TokenType.Item, 2))
-        # TODO: make sure in db
+        self.assertEqual((await ItemToken.get(id=2)).metadata_status, MetadataStatus.Valid.value)
+        self.assertIsNotNone(await ItemTokenMetadata.get_or_none(id=2))
 
 
     async def test_valid_place_metadata(self):
         """Test valid place metadata"""
         await self.processing.process_token((TokenType.Place, 2))
-        # TODO: make sure in db
+        self.assertEqual((await PlaceToken.get(id=2)).metadata_status, MetadataStatus.Valid.value)
+        self.assertIsNotNone(await PlaceTokenMetadata.get_or_none(id=2))
 
 
-    @test.expectedFailure
     async def test_invalid_item_metadata(self):
         """Test invalid place metadata"""
         await self.processing.process_token((TokenType.Item, 3))
+        self.assertEqual((await ItemToken.get(id=3)).metadata_status, MetadataStatus.Invalid.value)
 
 
-    @test.expectedFailure
     async def test_invalid_place_metadata(self):
         """Test invalid place metadata"""
         await self.processing.process_token((TokenType.Place, 3))
+        self.assertEqual((await PlaceToken.get(id=3)).metadata_status, MetadataStatus.Invalid.value)
 
 
-    @test.expectedFailure
     async def test_not_item_metadata(self):
         """Test not place metadata"""
         await self.processing.process_token((TokenType.Item, 4))
+        self.assertEqual((await ItemToken.get(id=4)).metadata_status, MetadataStatus.Invalid.value)
 
 
-    @test.expectedFailure
     async def test_not_place_metadata(self):
         """Test not place metadata"""
         await self.processing.process_token((TokenType.Place, 4))
+        self.assertEqual((await PlaceToken.get(id=4)).metadata_status, MetadataStatus.Invalid.value)

@@ -10,7 +10,7 @@ class TestTaskPool(test.IsolatedTestCase):
         raise Exception('This fails.')
 
     async def test_pool_failure(self):
-        """Make sure that TaskPool task fails properly"""
+        """Test tasks fail properly"""
         task_pool = TaskPool(1)
         pending_tasks = 0
 
