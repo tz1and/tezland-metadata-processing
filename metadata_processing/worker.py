@@ -1,15 +1,10 @@
-import asyncio
 from enum import Enum, unique
-import logging
-import platform
-import random
-import aiohttp
-import orjson
-import urllib.parse
+import logging, platform, random
+import asyncio, aiohttp
+import orjson, urllib.parse
 
 from json import JSONDecodeError
-import tortoise.transactions
-import tortoise.exceptions
+import tortoise.transactions, tortoise.exceptions
 
 from metadata_processing import __version__
 from metadata_processing.config import Config
@@ -81,7 +76,7 @@ class MetadataProcessing:
         self._logger.debug(f'Downloading {ipfs_uri}')
 
         try:
-            # TODO: don't fallback on 400 range error
+            # TODO: don't fallback on 400 range error: ClientResponseError
             return await self.ipfs_download(ipfs_uri, self._random_gateway())
         except asyncio.CancelledError as e:
             raise e
@@ -104,7 +99,7 @@ class MetadataProcessing:
 
         while True:
             try:
-                # TODO: don't retry on 400 range error
+                # TODO: don't retry on 400 range error: ClientResponseError
                 return await self.ipfs_download_fallback(ipfs_uri)
             except asyncio.CancelledError as e:
                 raise e

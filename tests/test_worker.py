@@ -34,15 +34,26 @@ class TestMetadataProcessing(test.TestCase):
     async def create_test_db(self):
         minter = await Holder.create(address="minter")
 
+        invalid_ipfs_uri = "ipfs://bafktestinvalidtestinvalidtestinvalidtestinvalidtestinvalid"
+
+        # Create invalid
         await ItemToken.create(
             id=1,
             royalties=10,
             minter=minter,
-            metadata_uri="ipfs://ssssss",
+            metadata_uri=invalid_ipfs_uri,
             supply=50,
             level=1,
             timestamp=datetime.now())
 
+        await PlaceToken.create(
+            id=1,
+            minter=minter,
+            metadata_uri=invalid_ipfs_uri,
+            level=1,
+            timestamp=datetime.now())
+
+        # Create valid
         await ItemToken.create(
             id=2,
             royalties=10,
@@ -53,32 +64,30 @@ class TestMetadataProcessing(test.TestCase):
             timestamp=datetime.now())
 
         await PlaceToken.create(
-            id=1,
-            minter=minter,
-            metadata_uri="ipfs://ssssss",
-            level=1,
-            timestamp=datetime.now())
-
-        await PlaceToken.create(
             id=2,
             minter=minter,
             metadata_uri="ipfs://bafkreih7y2mgq7akoorxv3asy4snlxkj6ns3eqblh43sb5comjvtletcwe",
             level=1,
             timestamp=datetime.now())
 
+
     async def test_valid_item_metadata(self):
         await self.processing.process_token((TokenType.Item, 2))
 
+
     async def test_valid_place_metadata(self):
         await self.processing.process_token((TokenType.Place, 2))
+
 
     @test.expectedFailure
     async def test_invalid_item_metadata_link(self):
         await self.processing.process_token((TokenType.Item, 1))
 
+
     @test.expectedFailure
     async def test_invalid_place_metadata_link(self):
         await self.processing.process_token((TokenType.Place, 1))
+
 
     async def test_pool_failure(self):
         """Make sure that TaskPool task fails properly."""
