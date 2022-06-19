@@ -216,14 +216,19 @@ class MetadataProcessing:
 
                 mime_type = None
                 file_size = None
+                found_format = False
                 for format in getOrRaise(metadata, 'formats'):
                     if getOrRaise(format, 'uri') == artifact_uri:
                         mime_type = getOrRaise(format, 'mimeType')
                         file_size = getOrRaise(format, 'fileSize')
+                        found_format = True
                         break
 
-                # make sure formats included artifact
-                assert mime_type is not None, "Format didn't include artifact"
+                # Make sure formats included artifact.
+                assert found_format is True, "Formats didn't include artifact"
+
+                # Validate mimeType.
+                assert mime_type in ['model/gltf-binary', 'model/gltf+json'], "Unsupported mime type"
 
                 # Split tags by comma as well. Because people are people...
                 metadata_tags: list[str] = getOrRaise(metadata, 'tags')

@@ -72,26 +72,30 @@ class TestMetadataProcessing(test.TestCase):
 
 
     async def test_valid_item_metadata(self):
+        print(' Test valid item metadata')
         await self.processing.process_token((TokenType.Item, 2))
 
 
     async def test_valid_place_metadata(self):
+        print(' Test valid place metadata')
         await self.processing.process_token((TokenType.Place, 2))
 
 
     @test.expectedFailure
     async def test_invalid_item_metadata_link(self):
+        print(' Test invalid item metadata link')
         await self.processing.process_token((TokenType.Item, 1))
 
 
     @test.expectedFailure
     async def test_invalid_place_metadata_link(self):
+        print(' Test invalid place metadata link')
         await self.processing.process_token((TokenType.Place, 1))
 
 
     async def test_pool_failure(self):
         """Make sure that TaskPool task fails properly."""
-        print("Testing TaskPool")
+        print(" Testing TaskPool")
         task_pool = TaskPool(1)
         pending_tasks = 0
 
@@ -112,4 +116,4 @@ class TestMetadataProcessing(test.TestCase):
         finally:
             await task_pool.join()
 
-        assert pending_tasks == 0, "pending_tasks isn't 0"
+        self.assertEqual(pending_tasks, 0, "pending_tasks isn't 0")
