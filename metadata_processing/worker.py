@@ -81,19 +81,20 @@ class MetadataProcessing:
         self._logger.debug(f'Downloading {ipfs_uri}')
 
         try:
+            # TODO: don't fallback on 400 range error
             return await self.ipfs_download(ipfs_uri, self._random_gateway())
         except asyncio.CancelledError as e:
             raise e
         except Exception as e:
-            self._logger.error(f'Download failed: {e}')
+            self._logger.error(f'IPFS Download failed: {e}')
 
             try:
                 return await self.ipfs_download(ipfs_uri, self._config.ipfs_fallback_gateway)
             except asyncio.CancelledError as e:
                 raise e
             except Exception as e:
-                self._logger.error(f'Download failed: {e}')
-                raise Exception('IPFS download failed.')
+                self._logger.error(f'IPFS Download failed: {e}')
+                raise Exception(f'IPFS download failed: {e}')
 
 
     async def ipfs_download_retry(self, ipfs_uri: str):
@@ -103,6 +104,7 @@ class MetadataProcessing:
 
         while True:
             try:
+                # TODO: don't retry on 400 range error
                 return await self.ipfs_download_fallback(ipfs_uri)
             except asyncio.CancelledError as e:
                 raise e
@@ -179,15 +181,14 @@ class MetadataProcessing:
                 place_token.metadata_status = MetadataStatus.Valid.value
                 place_token.metadata = place_token_metadata
                 await place_token.save()
-
         except tortoise.exceptions.TransactionManagementError as e:
-            self._logger.error(f'Transaction failed, Place token_id={token_id}: {e}')
+            raise Exception(f'Transaction failed, Place token_id={token_id}: {e}')
         except asyncio.CancelledError as e:
             raise e
         except Exception as e:
-            self._logger.error(f'Failed to process Place token {token_id} metadata: {e}')
             place_token.metadata_status = MetadataStatus.Failed.value
             await place_token.save()
+            raise Exception(f'Failed to process Place token_id={token_id} metadata: {e}')
 
 
     async def process_item_token(self, token_id: int):
@@ -313,15 +314,14 @@ class MetadataProcessing:
                         level=item_token.level,
                         timestamp=item_token.timestamp)
                     await tag_map_item.save()
-
         except tortoise.exceptions.TransactionManagementError as e:
-            self._logger.error(f'Transaction failed, Item token_id={token_id}: {e}')
+            raise Exception(f'Transaction failed, Item token_id={token_id}: {e}')
         except asyncio.CancelledError as e:
             raise e
         except Exception as e:
-            self._logger.error(f'Failed to process Item token {token_id} metadata: {e}')
             item_token.metadata_status = MetadataStatus.Failed.value
             await item_token.save()
+            raise Exception(f'Failed to process Item token_id={token_id} metadata: {e}')
 
 
     async def process_token(self, token: tuple[TokenType, int]):
@@ -338,7 +338,9 @@ class MetadataProcessing:
         except asyncio.CancelledError as e:
             raise e
         except Exception as e:
-            self._logger.error(f'Failed to process token: {e}')
+            message = f'Failed to process token: {e}'
+            self._logger.error(message)
+            raise Exception(message)
 
     async def init(self):
         #await Tortoise.init(

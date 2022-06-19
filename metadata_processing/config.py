@@ -6,9 +6,23 @@ _logger = logging.getLogger('Config')
 
 class Config:
     def __init__(self, env: str):
-        assert env in ('production', 'staging', 'development'), 'env is invalid'
+        assert env in ('production', 'staging', 'development', 'test'), 'env is invalid'
         _logger.info(f'Environment: {env}')
         self.env: str = env
+
+        self.processing_workers: int = 8
+
+        self.download_retries: int = 8
+
+        self.grid_size: float = 100.0 # default 100.0
+
+        self.polygon_count_error: float = 500.0 # default 500.0
+
+        self.http_timeout_seconds: float = 60.0 # default 60.0
+
+        # TODO
+        #MaxMetadataFileSize int     `default:"10000" split_words:"true"`
+        #MaxArtifactFileSize int     `default:"67108864" split_words:"true"`
 
         db_password: str = environ.get('POSTGRES_PASSWORD', 'changeme')
 
@@ -48,17 +62,15 @@ class Config:
             ]
 
             self.ipfs_fallback_gateway: str = 'http://backend-ipfs:8080'
+        elif self.env == 'test':
+            self.db_connection_url: str = f'sqlite://:memory:'
 
-        self.processing_workers: int = 8
+            self.ipfs_gateways: list[str] = [
+                'https://nftstorage.link'
+            ]
 
-        self.download_retries: int = 8
+            self.ipfs_fallback_gateway: str = 'http://backend-ipfs:8080'
 
-        self.grid_size: float = 100.0 # default 100.0
+            self.download_retries = 1
+            self.processing_workers = 1
 
-        self.polygon_count_error: float = 500.0 # default 500.0
-
-        self.http_timeout_seconds: float = 60.0 # default 60.0
-
-        # TODO
-        #MaxMetadataFileSize int     `default:"10000" split_words:"true"`
-        #MaxArtifactFileSize int     `default:"67108864" split_words:"true"`
