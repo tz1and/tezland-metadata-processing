@@ -10,6 +10,7 @@ class TaskPool(object):
         self.tasks = Queue()
         self.workers = []
         for _ in range(num_workers):
+            # TODO: use create_task?
             worker = asyncio.ensure_future(self.worker())
             self.workers.append(worker)
 
@@ -18,8 +19,12 @@ class TaskPool(object):
             future, task = await self.tasks.get()
             if task is TERMINATOR:
                 break
-            result = await asyncio.wait_for(task, None)
-            future.set_result(result)
+
+            try:
+                result = await asyncio.wait_for(task, None)
+                future.set_result(result)
+            except Exception as e:
+                future.set_exception(e)
 
     def submit(self, task):
         future = asyncio.Future()

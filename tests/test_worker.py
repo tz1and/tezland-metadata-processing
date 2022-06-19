@@ -90,15 +90,16 @@ class TestMetadataProcessing(test.TestCase):
             nonlocal pending_tasks
             pending_tasks -= 1
 
-        fut = task_pool.submit(asyncio.create_task(self.processing.process_token((TokenType.Item, 2))))
+        fut = task_pool.submit(asyncio.create_task(self.processing.process_token((TokenType.Item, 1))))
         fut.add_done_callback(decrementPending)
         pending_tasks += 1
 
         try:
             await fut
-            raise ("Task should fail")
         except:
             pass
+        else:
+            raise Exception("Task should fail")
         finally:
             await task_pool.join()
 
