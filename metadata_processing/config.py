@@ -20,9 +20,8 @@ class Config:
 
         self.http_timeout_seconds: float = 60.0 # default 60.0
 
-        # TODO
-        #MaxMetadataFileSize int     `default:"10000" split_words:"true"`
-        #MaxArtifactFileSize int     `default:"67108864" split_words:"true"`
+        self.max_metadata_file_size: int = 10000 # default 10000
+        self.max_artifact_file_size: int = 67108864 # default 67108864
 
         db_password: str = environ.get('POSTGRES_PASSWORD', 'changeme')
 

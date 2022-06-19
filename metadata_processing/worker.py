@@ -12,12 +12,15 @@ from metadata_processing.gltf_validation import count_gltf_polygons
 from metadata_processing.models import ItemTagMap, ItemToken, ItemTokenMetadata, PlaceToken, PlaceTokenMetadata, MetadataStatus, Tag
 from metadata_processing.utils import getGridCellHash, getOrRaise
 
+
 IPFS_PREFIX = 'ipfs://'
+
 
 @unique
 class TokenType(Enum):
     Item = 0
     Place = 1
+
 
 class MetadataProcessing:
     def __init__(self, config: Config) -> None:
@@ -47,7 +50,7 @@ class MetadataProcessing:
         return 'ipfs://' + urllib.parse.quote(urllib.parse.unquote(uri.removeprefix('ipfs://')))
 
 
-    async def ipfs_download(self, ipfs_uri: str, gateway: str):
+    async def ipfs_download(self, ipfs_uri: str, gateway: str, max_size: int = -1):
         """Wrapped aiohttp call with preconfigured headers and ratelimiting"""
         gateway_link = self._ipfs_gateway_link(self._fix_ipfs_uri(ipfs_uri), gateway)
         self._logger.debug(f'From {gateway_link}')
@@ -65,6 +68,7 @@ class MetadataProcessing:
             #if not (response.status >= 200 and response.status <= 299):
             #    raise Exception('download failed, response not 200')
 
+            # TODO: max_size does nothing currently.
             body = await response.read()
             try:
                 return (orjson.loads(body), len(body))
@@ -72,19 +76,19 @@ class MetadataProcessing:
                 return (body, len(body))
 
 
-    async def ipfs_download_fallback(self, ipfs_uri: str):
+    async def ipfs_download_fallback(self, ipfs_uri: str, max_size: int = -1):
         self._logger.debug(f'Downloading {ipfs_uri}')
 
         try:
             # TODO: don't fallback on 400 range error: ClientResponseError
-            return await self.ipfs_download(ipfs_uri, self._random_gateway())
+            return await self.ipfs_download(ipfs_uri, self._random_gateway(), max_size)
         except asyncio.CancelledError as e:
             raise e
         except Exception as e:
             self._logger.error(f'IPFS Download failed: {e}')
 
             try:
-                return await self.ipfs_download(ipfs_uri, self._config.ipfs_fallback_gateway)
+                return await self.ipfs_download(ipfs_uri, self._config.ipfs_fallback_gateway, max_size)
             except asyncio.CancelledError as e:
                 raise e
             except Exception as e:
@@ -92,7 +96,7 @@ class MetadataProcessing:
                 raise Exception(f'IPFS download failed: {e}')
 
 
-    async def ipfs_download_retry(self, ipfs_uri: str):
+    async def ipfs_download_retry(self, ipfs_uri: str, max_size: int = -1):
         attempt = 1
         sleep_time = 10
         backoff_factor = 1.5
@@ -100,7 +104,7 @@ class MetadataProcessing:
         while True:
             try:
                 # TODO: don't retry on 400 range error: ClientResponseError
-                return await self.ipfs_download_fallback(ipfs_uri)
+                return await self.ipfs_download_fallback(ipfs_uri, max_size)
             except asyncio.CancelledError as e:
                 raise e
             except:
@@ -130,7 +134,7 @@ class MetadataProcessing:
 
         # to catch unspecified errors and mark token as failed.
         try:
-            metadata, metadata_size = await self.ipfs_download_retry(place_token.metadata_uri)
+            metadata, _ = await self.ipfs_download_retry(place_token.metadata_uri, self._config.max_metadata_file_size)
 
             if isinstance(metadata, bytes):
                 self._logger.error("metadata invalid: not json")
@@ -200,7 +204,7 @@ class MetadataProcessing:
 
         # to catch unspecified errors and mark token as failed.
         try:
-            metadata, metadata_size = await self.ipfs_download_retry(item_token.metadata_uri)
+            metadata, _ = await self.ipfs_download_retry(item_token.metadata_uri, self._config.max_metadata_file_size)
 
             if isinstance(metadata, bytes):
                 self._logger.error("metadata invalid: not json")
@@ -244,13 +248,11 @@ class MetadataProcessing:
                 return
 
             # Download artifact
-            artifact, artifact_size = await self.ipfs_download_retry(artifact_uri)
+            artifact, artifact_size = await self.ipfs_download_retry(artifact_uri, self._config.max_artifact_file_size)
 
             try:
                 # Check file size
-                if artifact_size is None:
-                    self._logger.warn(f'file size not in response header, token_id={token_id}')
-                elif artifact_size != file_size:
+                if artifact_size != file_size:
                     raise Exception(f'file size does not match metadata, token_id={token_id}')
 
                 counted_polygons = count_gltf_polygons(artifact)

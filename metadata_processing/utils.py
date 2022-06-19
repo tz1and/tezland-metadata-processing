@@ -1,4 +1,3 @@
-from hashlib import sha1
 import hashlib
 import math
 
