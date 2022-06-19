@@ -1,11 +1,8 @@
-import asyncio
-import unittest
 from tortoise.contrib import test
 from tortoise.contrib.test import initializer, finalizer
 
 from datetime import datetime
 from metadata_processing.config import Config
-from metadata_processing.task_pool import TaskPool
 
 from metadata_processing.worker import MetadataProcessing, TokenType
 from metadata_processing.models import ItemToken, Holder, PlaceToken
@@ -35,85 +32,87 @@ class TestMetadataProcessing(test.TestCase):
         minter = await Holder.create(address="minter")
 
         invalid_ipfs_uri = "ipfs://bafktestinvalidtestinvalidtestinvalidtestinvalidtestinvalid"
+        invalid_metadata = "ipfs://QmfXz1ibFh1B24RqFyv49AyMNeNqhuhP815aXzEYswcsSU"
+        not_metadata = "ipfs://bafybeictsoehxf4zgdqrwppawr26l7l2bjpftftkdffgnnsfuroptfaoum/display.png"
 
-        # Create invalid
-        await ItemToken.create(
-            id=1,
-            royalties=10,
-            minter=minter,
-            metadata_uri=invalid_ipfs_uri,
-            supply=50,
-            level=1,
-            timestamp=datetime.now())
+        async def create_item(id, link):
+            await ItemToken.create(
+                id=id,
+                royalties=10,
+                minter=minter,
+                metadata_uri=link,
+                supply=50,
+                level=1,
+                timestamp=datetime.now())
 
-        await PlaceToken.create(
-            id=1,
-            minter=minter,
-            metadata_uri=invalid_ipfs_uri,
-            level=1,
-            timestamp=datetime.now())
+        async def create_place(id, link):
+            await PlaceToken.create(
+                id=id,
+                minter=minter,
+                metadata_uri=link,
+                level=1,
+                timestamp=datetime.now())
+
+        # Create invalid link
+        await create_item(1, invalid_ipfs_uri)
+        await create_place(1, invalid_ipfs_uri)
 
         # Create valid
-        await ItemToken.create(
-            id=2,
-            royalties=10,
-            minter=minter,
-            metadata_uri="ipfs://bafkreif73mu4bhbjrxktsxmggxftzx4yfanaqsqmga3pacatwpwuitd37e",
-            supply=50,
-            level=1,
-            timestamp=datetime.now())
+        await create_item(2, "ipfs://bafkreif73mu4bhbjrxktsxmggxftzx4yfanaqsqmga3pacatwpwuitd37e")
+        await create_place(2, "ipfs://bafkreih7y2mgq7akoorxv3asy4snlxkj6ns3eqblh43sb5comjvtletcwe")
+        
+        # Create invalid metadata
+        await create_item(3, invalid_metadata)
+        await create_place(3, invalid_metadata)
 
-        await PlaceToken.create(
-            id=2,
-            minter=minter,
-            metadata_uri="ipfs://bafkreih7y2mgq7akoorxv3asy4snlxkj6ns3eqblh43sb5comjvtletcwe",
-            level=1,
-            timestamp=datetime.now())
-
-
-    async def test_valid_item_metadata(self):
-        print(' Test valid item metadata')
-        await self.processing.process_token((TokenType.Item, 2))
-
-
-    async def test_valid_place_metadata(self):
-        print(' Test valid place metadata')
-        await self.processing.process_token((TokenType.Place, 2))
+        # Create not metadata
+        await create_item(4, not_metadata)
+        await create_place(4, not_metadata)
 
 
     @test.expectedFailure
     async def test_invalid_item_metadata_link(self):
-        print(' Test invalid item metadata link')
+        """Test invalid item metadata link"""
         await self.processing.process_token((TokenType.Item, 1))
 
 
     @test.expectedFailure
     async def test_invalid_place_metadata_link(self):
-        print(' Test invalid place metadata link')
+        """Test invalid place metadata link"""
         await self.processing.process_token((TokenType.Place, 1))
 
 
-    async def test_pool_failure(self):
-        """Make sure that TaskPool task fails properly."""
-        print(" Testing TaskPool")
-        task_pool = TaskPool(1)
-        pending_tasks = 0
+    async def test_valid_item_metadata(self):
+        """Test valid item metadata"""
+        await self.processing.process_token((TokenType.Item, 2))
+        # TODO: make sure in db
 
-        def decrementPending(f):
-            nonlocal pending_tasks
-            pending_tasks -= 1
 
-        fut = task_pool.submit(asyncio.create_task(self.processing.process_token((TokenType.Item, 1))))
-        fut.add_done_callback(decrementPending)
-        pending_tasks += 1
+    async def test_valid_place_metadata(self):
+        """Test valid place metadata"""
+        await self.processing.process_token((TokenType.Place, 2))
+        # TODO: make sure in db
 
-        try:
-            await fut
-        except:
-            pass
-        else:
-            raise Exception("Task should fail")
-        finally:
-            await task_pool.join()
 
-        self.assertEqual(pending_tasks, 0, "pending_tasks isn't 0")
+    @test.expectedFailure
+    async def test_invalid_item_metadata(self):
+        """Test invalid place metadata"""
+        await self.processing.process_token((TokenType.Item, 3))
+
+
+    @test.expectedFailure
+    async def test_invalid_place_metadata(self):
+        """Test invalid place metadata"""
+        await self.processing.process_token((TokenType.Place, 3))
+
+
+    @test.expectedFailure
+    async def test_not_item_metadata(self):
+        """Test not place metadata"""
+        await self.processing.process_token((TokenType.Item, 4))
+
+
+    @test.expectedFailure
+    async def test_not_place_metadata(self):
+        """Test not place metadata"""
+        await self.processing.process_token((TokenType.Place, 4))
