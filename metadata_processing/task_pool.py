@@ -34,7 +34,7 @@ class TaskPool(object):
                     future.set_exception(e)
 
                 if future.cancelled():
-                    return
+                    raise asyncio.CancelledError
         except asyncio.CancelledError:
             logging.info("TaskPool worker cancelled")
             raise
