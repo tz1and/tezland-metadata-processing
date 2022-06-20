@@ -16,23 +16,28 @@ class TaskPool(object):
 
 
     async def worker(self):
-        while True:
-            future: asyncio.Future
-            task: asyncio.Task
-            future, task = await self.tasks.get()
+        try:
+            while True:
+                future: asyncio.Future
+                task: asyncio.Task
+                future, task = await self.tasks.get()
 
-            if task is TERMINATOR:
-                break
+                if task is TERMINATOR:
+                    logging.info("TaskPool worker terminated")
+                    break
 
-            # If wait_for fails, set exception
-            try:
-                result = await asyncio.wait_for(task, None)
-                future.set_result(result)
-            except Exception as e:
-                future.set_exception(e)
+                # If wait_for fails, set exception
+                try:
+                    result = await asyncio.wait_for(task, None)
+                    future.set_result(result)
+                except Exception as e:
+                    future.set_exception(e)
 
-            if future.cancelled():
-                return
+                if future.cancelled():
+                    return
+        except asyncio.CancelledError:
+            logging.info("TaskPool worker cancelled")
+            raise
 
 
     def submit(self, task):
