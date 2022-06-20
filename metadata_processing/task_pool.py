@@ -31,6 +31,9 @@ class TaskPool(object):
             except Exception as e:
                 future.set_exception(e)
 
+            if future.cancelled():
+                return
+
 
     def submit(self, task):
         future = asyncio.Future()
