@@ -120,8 +120,8 @@ class MetadataProcessing:
         place_token = await PlaceToken.get(id=token_id)
 
         # If we already have the metadata processed, use that.
-        place_token_metadata = await PlaceTokenMetadata.filter(id=token_id).first()
-        if place_token_metadata:
+        place_token_metadata = await PlaceTokenMetadata.get_or_none(id=token_id)
+        if place_token_metadata is not None:
             place_token.metadata_status = MetadataStatus.Valid.value
             place_token.metadata = place_token_metadata
             await place_token.save()
@@ -190,8 +190,8 @@ class MetadataProcessing:
         item_token = await ItemToken.get(id=token_id)
 
         # If we already have the metadata processed, use that.
-        item_token_metadata = await ItemTokenMetadata.filter(id=token_id).first()
-        if item_token_metadata:
+        item_token_metadata = await ItemTokenMetadata.get_or_none(id=token_id)
+        if item_token_metadata is not None:
             item_token.metadata_status = MetadataStatus.Valid.value
             item_token.metadata = item_token_metadata
             await item_token.save()

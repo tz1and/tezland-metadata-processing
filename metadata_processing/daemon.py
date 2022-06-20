@@ -74,6 +74,7 @@ async def token_processing_task(config: Config):
         _logger.info("Shutdown requested")
     finally:
         task_pool.cancel_all()
+        # TODO: maybe shield() these? seems kinda important.
         await task_pool.join()
         await processing.shutdown()
         await Tortoise.close_connections()
