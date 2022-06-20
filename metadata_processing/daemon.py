@@ -89,7 +89,6 @@ def main():
     config = Config(args.env)
 
     loop = asyncio.get_event_loop()
-    # TODO: use create_task?
     main_task = asyncio.ensure_future(token_processing_task(config))
     
     for signal in [SIGINT, SIGTERM]:
