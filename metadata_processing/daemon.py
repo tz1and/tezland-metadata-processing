@@ -27,8 +27,6 @@ async def wait_for_database_online(config: Config):
             _logger.info(f'DB connected')
 
             break
-        except asyncio.CancelledError as e:
-            raise e
         except Exception as e:
             _logger.info(f'DB connection failed: {e}, sleeping for 10s')
             await asyncio.sleep(10)
@@ -75,6 +73,7 @@ async def token_processing_task(config: Config):
     except asyncio.CancelledError:
         _logger.info("Shutdown requested")
     finally:
+        task_pool.cancel_all()
         await task_pool.join()
         await processing.shutdown()
         await Tortoise.close_connections()
@@ -90,6 +89,7 @@ def main():
     config = Config(args.env)
 
     loop = asyncio.get_event_loop()
+    # TODO: use create_task?
     main_task = asyncio.ensure_future(token_processing_task(config))
     
     for signal in [SIGINT, SIGTERM]:

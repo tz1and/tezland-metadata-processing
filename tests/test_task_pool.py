@@ -24,7 +24,7 @@ class TestTaskPool(test.IsolatedTestCase):
 
         try:
             await fut
-        except:
+        except Exception:
             pass
         else:
             raise Exception("Task should fail")

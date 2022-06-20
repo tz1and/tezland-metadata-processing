@@ -72,16 +72,16 @@ class TestMetadataProcessing(test.TestCase):
 
     async def test_invalid_item_metadata_link(self):
         """Test invalid item metadata link"""
-        with self.assertRaises(Exception):
-            await self.processing.process_token((TokenType.Item, 1))
+        await self.processing.process_token((TokenType.Item, 1))
         self.assertEqual((await ItemToken.get(id=1)).metadata_status, MetadataStatus.Failed.value)
+        self.assertIsNone(await ItemTokenMetadata.get_or_none(id=1))
 
 
     async def test_invalid_place_metadata_link(self):
         """Test invalid place metadata link"""
-        with self.assertRaises(Exception):
-            await self.processing.process_token((TokenType.Place, 1))
+        await self.processing.process_token((TokenType.Place, 1))
         self.assertEqual((await PlaceToken.get(id=1)).metadata_status, MetadataStatus.Failed.value)
+        self.assertIsNone(await PlaceTokenMetadata.get_or_none(id=1))
 
 
     async def test_valid_item_metadata(self):
@@ -102,21 +102,25 @@ class TestMetadataProcessing(test.TestCase):
         """Test invalid place metadata"""
         await self.processing.process_token((TokenType.Item, 3))
         self.assertEqual((await ItemToken.get(id=3)).metadata_status, MetadataStatus.Invalid.value)
+        self.assertIsNone(await ItemTokenMetadata.get_or_none(id=3))
 
 
     async def test_invalid_place_metadata(self):
         """Test invalid place metadata"""
         await self.processing.process_token((TokenType.Place, 3))
         self.assertEqual((await PlaceToken.get(id=3)).metadata_status, MetadataStatus.Invalid.value)
+        self.assertIsNone(await PlaceTokenMetadata.get_or_none(id=3))
 
 
     async def test_not_item_metadata(self):
         """Test not place metadata"""
         await self.processing.process_token((TokenType.Item, 4))
         self.assertEqual((await ItemToken.get(id=4)).metadata_status, MetadataStatus.Invalid.value)
+        self.assertIsNone(await ItemTokenMetadata.get_or_none(id=4))
 
 
     async def test_not_place_metadata(self):
         """Test not place metadata"""
         await self.processing.process_token((TokenType.Place, 4))
         self.assertEqual((await PlaceToken.get(id=4)).metadata_status, MetadataStatus.Invalid.value)
+        self.assertIsNone(await PlaceTokenMetadata.get_or_none(id=4))
