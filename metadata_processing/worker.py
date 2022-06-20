@@ -154,7 +154,7 @@ class MetadataProcessing:
                 # refresh from DB in case the thing has been deleted.
                 await place_token.refresh_from_db()
 
-                place_token_metadata = PlaceTokenMetadata(
+                place_token_metadata = await PlaceTokenMetadata.create(
                     id=place_token.id,
                     name=metadata.get('name', ''),
                     description=metadata.get('description', ''),
@@ -165,12 +165,6 @@ class MetadataProcessing:
                     grid_hash=grid_hash,
                     level=place_token.level,
                     timestamp=place_token.timestamp)
-
-                #if await PlaceTokenMetadata.exists(id=place_token.id):
-                #    self._logger.debug(f'metadata for token_id={token_id} exists, updating')
-                #    await place_token_metadata.save(force_update=True)
-                #else:
-                await place_token_metadata.save()
 
                 place_token.metadata_status = MetadataStatus.Valid.value
                 place_token.metadata = place_token_metadata
@@ -272,7 +266,7 @@ class MetadataProcessing:
                 # refresh from DB in case the thing has been deleted.
                 await item_token.refresh_from_db()
 
-                item_token_metadata = ItemTokenMetadata(
+                item_token_metadata = await ItemTokenMetadata.create(
                     id=item_token.id,
                     name=metadata.get('name', ''),
                     description=metadata.get('description', ''),
@@ -286,15 +280,6 @@ class MetadataProcessing:
                     level=item_token.level,
                     timestamp=item_token.timestamp)
 
-                #if await ItemTokenMetadata.exists(id=item_token.id):
-                #    self._logger.debug(f'metadata for token_id={token_id} exists, updating')
-                #    await item_token_metadata.save(force_update=True)
-                #
-                #    # delete tag map if it's an update.
-                #    await ItemTagMap.filter(item_metadata=item_token_metadata.id).delete()
-                #else:
-                await item_token_metadata.save()
-
                 item_token.metadata_status = MetadataStatus.Valid.value
                 item_token.metadata = item_token_metadata
                 await item_token.save()
@@ -305,12 +290,11 @@ class MetadataProcessing:
                         'timestamp': item_token.timestamp
                     })
 
-                    tag_map_item = ItemTagMap(
+                    await ItemTagMap.create(
                         item_metadata=item_token_metadata,
                         tag=tag,
                         level=item_token.level,
                         timestamp=item_token.timestamp)
-                    await tag_map_item.save()
         # If it fails due to a transaction error, don't mark it as failed.
         except tortoise.exceptions.TransactionManagementError as e:
             raise Exception(f'Transaction failed, Item token_id={token_id}: {e}') from e
