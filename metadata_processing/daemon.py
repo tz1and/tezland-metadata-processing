@@ -37,6 +37,10 @@ async def token_processing_task(config: Config):
     place_cursor = Cursor(PlaceToken)
 
     try:
+        wait_time = 30
+        _logger.info(f'Waiting {wait_time} seconds before startup')
+        await asyncio.sleep(wait_time)
+
         await wait_for_database_online(config)
 
         processing = MetadataProcessing(config)

@@ -44,23 +44,21 @@ class Config:
                 'https://ipfs.io',
                 'https://cloudflare-ipfs.com',
                 'https://nftstorage.link',
-                'https://infura-ipfs.io'
+                'https://infura-ipfs.io',
+                'http://ipfs:8080'
             ]
 
-            self.ipfs_fallback_gateway: str = 'http://backend-ipfs:8080'
+            self.ipfs_fallback_gateway: str = 'http://ipfs:8080'
         elif self.env == 'development':
-            self.db_connection_url: str = f'postgres://dipdup:{db_password}@localhost:15435/dipdup'
+            self.db_connection_url: str = f'postgres://dipdup:{db_password}@db-dipdup:15435/dipdup'
             #self.db_connection_url = 'sqlite://../tezland-indexer/landex.sqlite3'
             #self.db_connection_url = 'sqlite://db.sqlite3'
 
             self.ipfs_gateways: list[str] = [
-                'https://ipfs.io',
-                'https://cloudflare-ipfs.com',
-                'https://nftstorage.link',
-                'https://infura-ipfs.io'
+                'http://ipfs:8080'
             ]
 
-            self.ipfs_fallback_gateway: str = 'http://backend-ipfs:8080'
+            self.ipfs_fallback_gateway: str = 'http://ipfs:8080'
         elif self.env == 'test':
             self.db_connection_url: str = f'sqlite://:memory:'
 

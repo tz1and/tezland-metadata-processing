@@ -144,7 +144,8 @@ class MetadataProcessing:
                 center_coordinates: list[float] = getOrRaise(metadata, 'centerCoordinates')
                 build_height = getOrRaise(metadata, 'buildHeight')
                 grid_hash = getGridCellHash(center_coordinates[0], center_coordinates[1], center_coordinates[2], self._config.grid_size)
-            except Exception:
+            except Exception as e:
+                self._logger.error(f'required fields: {e}')
                 place_token.metadata_status = MetadataStatus.Invalid.value
                 await place_token.save()
                 return
@@ -154,6 +155,7 @@ class MetadataProcessing:
                 # refresh from DB in case the thing has been deleted.
                 await place_token.refresh_from_db()
 
+                # TODO: maybe don't use create and get_or_create. something with transactions.
                 place_token_metadata = await PlaceTokenMetadata.create(
                     id=place_token.id,
                     name=metadata.get('name', ''),
@@ -231,7 +233,8 @@ class MetadataProcessing:
                         stripped = split.strip()
                         if len(stripped) > 0:
                             tags.append(stripped.lower())
-            except Exception:
+            except Exception as e:
+                self._logger.error(f'required fields: {e}')
                 item_token.metadata_status = MetadataStatus.Invalid.value
                 await item_token.save()
                 return
@@ -266,6 +269,7 @@ class MetadataProcessing:
                 # refresh from DB in case the thing has been deleted.
                 await item_token.refresh_from_db()
 
+                # TODO: maybe don't use create and get_or_create. something with transactions.
                 item_token_metadata = await ItemTokenMetadata.create(
                     id=item_token.id,
                     name=metadata.get('name', ''),
