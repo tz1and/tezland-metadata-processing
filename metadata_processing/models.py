@@ -5,7 +5,6 @@ from tortoise import Model, fields
 
 # TODO: probably shouldn't be called holder?
 # maybe Account or TezosAccount or TezlandAccount?
-# TODO: holder should be by id, probably, we can union the address in queries.
 class Holder(Model):
     address = fields.CharField(max_length=36, pk=True)
     balance = fields.DecimalField(decimal_places=8, max_digits=20, default=0)
@@ -13,7 +12,18 @@ class Holder(Model):
     tx_count = fields.BigIntField(default=0)
     last_seen = fields.DatetimeField(null=True)
 
-# Levelled base
+# Levelled base with transient id
+class LevelledBaseTransient(Model):
+    # Call the pk transient_id, to let there be no doubt what it is.
+    transient_id = fields.BigIntField(pk=True)
+
+    level = fields.BigIntField(null=False)
+    timestamp = fields.DatetimeField(null=False)
+
+    class Meta:
+        abstract = True
+
+# Levelled base where id == onchain id
 class LevelledBase(Model):
     id = fields.BigIntField(pk=True)
 
@@ -31,12 +41,16 @@ class MetadataStatus(Enum):
     Failed = 2
     Invalid = 3
 
-class BaseToken(LevelledBase):
+class BaseToken(LevelledBaseTransient):
+    token_id = fields.BigIntField(null=False, index=True)
+    contract = fields.CharField(max_length=36, null=False, index=True)
+
     metadata_uri = fields.TextField(null=False)
     metadata_status = fields.BigIntField(default=int(MetadataStatus.New.value))
 
     class Meta:
         abstract = True
+        unique_together = ('token_id', 'contract')
 
 class ItemToken(BaseToken):
     minter = fields.ForeignKeyField('models.Holder', 'item_tokens', null=False, index=True)
@@ -57,12 +71,17 @@ class PlaceToken(BaseToken):
         table = 'place_token'
 
 # Metadata
-class BaseMetadata(LevelledBase):
+class BaseMetadata(LevelledBaseTransient):
+    # TODO: probably not needed if we always search metadata by token.
+    token_id = fields.BigIntField(null=False, index=True)
+    contract = fields.CharField(max_length=36, null=False, index=True)
+
     name = fields.TextField(default='')
     description = fields.TextField(default='')
 
     class Meta:
         abstract = True
+        unique_together = ('token_id', 'contract')
 
 class ItemTokenMetadata(BaseMetadata):
     artifact_uri = fields.TextField(null=False)
@@ -90,6 +109,8 @@ class PlaceTokenMetadata(BaseMetadata):
 # Token holders
 class ItemTokenHolder(Model):
     holder = fields.ForeignKeyField('models.Holder', 'holders_item_token', null=False, index=True)
+    # NOTE: this will result in a field tokenId, which is the transient id, not the onchain id...
+    # Unfortunatly can't change the foreign key name.
     token = fields.ForeignKeyField('models.ItemToken', 'item_token_holders', null=False, index=True)
     quantity = fields.BigIntField(default=0)
 
@@ -98,14 +119,17 @@ class ItemTokenHolder(Model):
 
 class PlaceTokenHolder(Model):
     holder = fields.ForeignKeyField('models.Holder', 'holders_place_token', null=False, index=True)
+    # NOTE: this will result in a field tokenId, which is the transient id, not the onchain id...
+    # Unfortunatly can't change the foreign key name.
     token = fields.ForeignKeyField('models.PlaceToken', 'place_token_holders', null=False, index=True)
 
     class Meta:
         table = 'place_token_holder'
 
 # World
-class WorldItemPlacement(LevelledBase):
+class WorldItemPlacement(LevelledBaseTransient):
     place = fields.ForeignKeyField('models.PlaceToken', 'world_item_placements', null=False, index=True)
+    chunk = fields.BigIntField(null=False)
     issuer = fields.ForeignKeyField('models.Holder', 'item_token_placements', null=False, index=True)
     item_token = fields.ForeignKeyField('models.ItemToken', 'item_token_placements', null=False, index=True)
 
@@ -116,14 +140,14 @@ class WorldItemPlacement(LevelledBase):
 
     class Meta:
         table = 'world_item_placement'
-        unique_together = ('item_id', 'place')
+        unique_together = ('chunk', 'item_id', 'place')
 
 # TODO:
 # class WorldFA2ItemPlacement
 # class WorldOtherItemPlacement
 # Or: handle all of those this the same table (prob preferred)
 
-class ItemCollectionHistory(LevelledBase):
+class ItemCollectionHistory(LevelledBaseTransient):
     place = fields.ForeignKeyField('models.PlaceToken', 'item_collection_histories', null=False, index=True)
     item_token = fields.ForeignKeyField('models.ItemToken', 'collection_histories', null=False, index=True)
 
@@ -144,7 +168,7 @@ class ItemCollectionHistory(LevelledBase):
 #        table = 'place_prop'
 
 # Auctions
-class DutchAuction(LevelledBase):
+class DutchAuction(LevelledBaseTransient):
     token_id = fields.BigIntField(index=True)
     owner = fields.ForeignKeyField('models.Holder', 'created_dutch_auctions', null=False, index=True)
     start_time = fields.DatetimeField(null=False)
@@ -160,6 +184,7 @@ class DutchAuction(LevelledBase):
 
     class Meta:
         table = 'dutch_auction'
+        unique_together = ('token_id', 'fa2', 'owner')
 
 # Whitelist
 class DutchAuctionWhitelist(Model):
@@ -176,14 +201,14 @@ class DutchAuctionWhitelist(Model):
         table = 'dutch_auction_whitelist'
 
 # Tags
-class Tag(LevelledBase):
+class Tag(LevelledBaseTransient):
     name = fields.CharField(max_length=255, null=False, unique=True, index=True)
 
     class Meta:
         table = 'tag'
 
-class ItemTagMap(LevelledBase):
-    item_metadata = fields.ForeignKeyField('models.ItemTokenMetadata', 'tag_map', null=False, index=True)
+class ItemTagMap(LevelledBaseTransient):
+    item_metadata = fields.ForeignKeyField('models.ItemTokenMetadata', 'tag_map', null=False, index=True, on_delete=fields.CASCADE)
     tag = fields.ForeignKeyField('models.Tag', 'tag_map', null=False, index=True)
 
     class Meta:

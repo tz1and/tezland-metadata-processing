@@ -14,16 +14,16 @@ class Cursor:
     async def next(self) -> Model:
         if self.current is None:
             next = await self.model_class.filter(
-                id__gte=0,
-                #id__lt=20,
+                transient_id__gte=0,
+                #transient_id__lt=20,
                 metadata_status=MetadataStatus.New.value
-            ).order_by('id').first()
+            ).order_by('transient_id').first()
         else:
             next = await self.model_class.filter(
-                id__gt=self.current.id,
-                #id__lt=20,
+                transient_id__gt=self.current.transient_id,
+                #transient_id__lt=20,
                 metadata_status=MetadataStatus.New.value
-            ).order_by('id').first()
+            ).order_by('transient_id').first()
 
         if next is not None:
             self.current = next

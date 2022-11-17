@@ -58,12 +58,12 @@ async def token_processing_task(config: Config):
                 next_item = await item_cursor.next()
                 if next_item is not None:
                     pending_tasks += 1
-                    task_pool.submit(asyncio.create_task(processing.process_token((TokenType.Item, next_item.id)))).add_done_callback(decrementPending)
+                    task_pool.submit(asyncio.create_task(processing.process_token((TokenType.Item, next_item.transient_id)))).add_done_callback(decrementPending)
 
                 next_place = await place_cursor.next()
                 if next_place is not None:
                     pending_tasks += 1
-                    task_pool.submit(asyncio.create_task(processing.process_token((TokenType.Place, next_place.id)))).add_done_callback(decrementPending)
+                    task_pool.submit(asyncio.create_task(processing.process_token((TokenType.Place, next_place.transient_id)))).add_done_callback(decrementPending)
 
                 if next_item is None and next_place is None:
                     # reset cursors to starting position if all tasks done
