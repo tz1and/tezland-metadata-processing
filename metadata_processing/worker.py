@@ -1,6 +1,7 @@
 from enum import Enum, unique
 import logging, platform, random
 import asyncio, aiohttp
+from typing import Any
 import orjson, urllib.parse
 
 from json import JSONDecodeError
@@ -9,7 +10,7 @@ import tortoise.transactions, tortoise.exceptions
 from metadata_processing import __version__
 from metadata_processing.config import Config
 from metadata_processing.gltf_validation import count_gltf_polygons
-from metadata_processing.models import ItemTagMap, ItemToken, ItemTokenMetadata, PlaceToken, PlaceTokenMetadata, MetadataStatus, Tag, IpfsMetadataCache
+from metadata_processing.models import ItemTagMap, ItemToken, ItemTokenMetadata, PlaceToken, PlaceTokenMetadata, MetadataStatus, Tag, IpfsMetadataCache, BaseToken
 from metadata_processing.utils import getGridCellHash, getOrRaise
 
 
@@ -115,6 +116,30 @@ class MetadataProcessing:
         raise Exception(f'IPFS download failed after {attempt} retries.')
 
 
+    async def download_and_cache_token_metadata(self, token: BaseToken) -> Any:
+        # transaction for metadata cache
+        async with tortoise.transactions.in_transaction():
+            # If we already have the metadata cached, use that.
+            metadata_cache = await IpfsMetadataCache.get_or_none(metadata_uri=token.metadata_uri)
+
+            if metadata_cache is not None:
+                metadata = metadata_cache.metadata_json
+                self._logger.info(f'Loaded ipfs metadata from cache: {token.metadata_uri}')
+            else:
+                metadata, _ = await self.ipfs_download_retry(token.metadata_uri, self._config.max_metadata_file_size)
+
+                if isinstance(metadata, bytes):
+                    self._logger.error("metadata invalid: not json")
+                    token.metadata_status = MetadataStatus.Invalid.value
+                    await token.save()
+                    return
+
+                await IpfsMetadataCache.create(metadata_uri=token.metadata_uri, metadata_json=metadata)
+                self._logger.info(f'Cached ipfs metadata: {token.metadata_uri}')
+
+            return metadata
+
+
     async def process_place_token(self, transient_id: int):
         place_token = await PlaceToken.get(transient_id=transient_id).prefetch_related("contract", "metadata")
         self._logger.info(f'Processing Place token {place_token.token_id} ({place_token.contract.address})...')
@@ -125,23 +150,7 @@ class MetadataProcessing:
 
         # to catch unspecified errors and mark token as failed.
         try:
-            # If we already have the metadata cached, use that.
-            metadata_cache = await IpfsMetadataCache.get_or_none(metadata_uri=place_token.metadata_uri)
-
-            if metadata_cache is not None:
-                metadata = metadata_cache.metadata_json
-                self._logger.info(f'Loaded ipfs metadata from cache: {place_token.metadata_uri}')
-            else:
-                metadata, _ = await self.ipfs_download_retry(place_token.metadata_uri, self._config.max_metadata_file_size)
-
-                if isinstance(metadata, bytes):
-                    self._logger.error("metadata invalid: not json")
-                    place_token.metadata_status = MetadataStatus.Invalid.value
-                    await place_token.save()
-                    return
-
-                await IpfsMetadataCache.update_or_create(metadata_uri=place_token.metadata_uri, defaults=dict(metadata_json=metadata))
-                self._logger.info(f'Cached ipfs metadata: {place_token.metadata_uri}')
+            metadata = await self.download_and_cache_token_metadata(place_token)
 
             # required fields
             try:
@@ -157,7 +166,7 @@ class MetadataProcessing:
                 await place_token.save()
                 return
 
-            # from here on, everything should be a transaction
+            # transaction for creating metadata, saving place
             async with tortoise.transactions.in_transaction():
                 # refresh from DB in case the thing has been deleted.
                 await place_token.refresh_from_db()
@@ -197,23 +206,7 @@ class MetadataProcessing:
 
         # to catch unspecified errors and mark token as failed.
         try:
-            # If we already have the metadata cached, use that.
-            metadata_cache = await IpfsMetadataCache.get_or_none(metadata_uri=item_token.metadata_uri)
-
-            if metadata_cache is not None:
-                metadata = metadata_cache.metadata_json
-                self._logger.info(f'Loaded ipfs metadata from cache: {item_token.metadata_uri}')
-            else:
-                metadata, _ = await self.ipfs_download_retry(item_token.metadata_uri, self._config.max_metadata_file_size)
-
-                if isinstance(metadata, bytes):
-                    self._logger.error("metadata invalid: not json")
-                    item_token.metadata_status = MetadataStatus.Invalid.value
-                    await item_token.save()
-                    return
-
-                await IpfsMetadataCache.update_or_create(metadata_uri=item_token.metadata_uri, defaults=dict(metadata_json=metadata))
-                self._logger.info(f'Cached ipfs metadata: {item_token.metadata_uri}')
+            metadata = await self.download_and_cache_token_metadata(item_token)
 
             # required fields
             try:
@@ -276,7 +269,7 @@ class MetadataProcessing:
                 await item_token.save()
                 return
 
-            # from here on, everything should be a transaction
+            # transaction for creating metadata, saving item and tags
             async with tortoise.transactions.in_transaction():
                 # refresh from DB in case the thing has been deleted.
                 await item_token.refresh_from_db()
