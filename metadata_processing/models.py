@@ -12,6 +12,7 @@ class Holder(Model):
     tx_count = fields.BigIntField(default=0)
     last_seen = fields.DatetimeField(null=True)
 
+
 # Levelled base with transient id
 class LevelledBaseTransient(Model):
     # Call the pk transient_id, to let there be no doubt what it is.
@@ -23,6 +24,7 @@ class LevelledBaseTransient(Model):
     class Meta:
         abstract = True
 
+
 # Levelled base where id == onchain id
 class LevelledBase(Model):
     id = fields.BigIntField(pk=True)
@@ -33,6 +35,22 @@ class LevelledBase(Model):
     class Meta:
         abstract = True
 
+
+# Contracts
+class PlaceContract(LevelledBaseTransient):
+    address = fields.CharField(max_length=36, index=True)
+
+    class Meta:
+        table = 'place_contract'
+
+
+class ItemContract(LevelledBaseTransient):
+    address = fields.CharField(max_length=36, index=True)
+
+    class Meta:
+        table = 'item_contract'
+
+
 # Tokens
 @unique
 class MetadataStatus(Enum):
@@ -41,49 +59,59 @@ class MetadataStatus(Enum):
     Failed = 2
     Invalid = 3
 
+
 class BaseToken(LevelledBaseTransient):
     token_id = fields.BigIntField(null=False, index=True)
-    contract = fields.CharField(max_length=36, null=False, index=True)
 
     metadata_uri = fields.TextField(null=False)
     metadata_status = fields.BigIntField(default=int(MetadataStatus.New.value))
 
     class Meta:
         abstract = True
-        unique_together = ('token_id', 'contract')
+
 
 class ItemToken(BaseToken):
+    contract = fields.ForeignKeyField('models.ItemContract', 'item_tokens', null=False, index=True)
     minter = fields.ForeignKeyField('models.Holder', 'item_tokens', null=False, index=True)
     royalties = fields.SmallIntField(default=0)
     supply = fields.BigIntField(default=0)
 
-    metadata = fields.ForeignKeyField('models.ItemTokenMetadata', 'item_token', index=True, null=True, on_delete=fields.SET_NULL)
+    metadata = fields.OneToOneField('models.ItemTokenMetadata', 'item_token', null=True)
 
     class Meta:
         table = 'item_token'
+        unique_together = ('token_id', 'contract')
+
 
 class PlaceToken(BaseToken):
+    contract = fields.ForeignKeyField('models.PlaceContract', 'place_tokens', null=False, index=True)
     minter = fields.ForeignKeyField('models.Holder', 'place_tokens', null=False, index=True)
 
-    metadata = fields.ForeignKeyField('models.PlaceTokenMetadata', 'place_token', index=True, null=True, on_delete=fields.SET_NULL)
+    metadata = fields.OneToOneField('models.PlaceTokenMetadata', 'place_token', null=True)
 
     class Meta:
         table = 'place_token'
+        unique_together = ('token_id', 'contract')
+
 
 # Metadata
-class BaseMetadata(LevelledBaseTransient):
-    # TODO: probably not needed if we always search metadata by token.
-    token_id = fields.BigIntField(null=False, index=True)
-    contract = fields.CharField(max_length=36, null=False, index=True)
+class IpfsMetadataCache(Model):
+    metadata_uri = fields.CharField(max_length=66, pk=True)
+    metadata_json = fields.JSONField()
 
+    class Meta:
+        table = 'ipfs_metadata_cache'
+
+
+class BaseTokenMetadata(LevelledBaseTransient):
     name = fields.TextField(default='')
     description = fields.TextField(default='')
 
     class Meta:
         abstract = True
-        unique_together = ('token_id', 'contract')
 
-class ItemTokenMetadata(BaseMetadata):
+
+class ItemTokenMetadata(BaseTokenMetadata):
     artifact_uri = fields.TextField(null=False)
     thumbnail_uri = fields.TextField(null=True)
     display_uri = fields.TextField(null=True)
@@ -96,7 +124,8 @@ class ItemTokenMetadata(BaseMetadata):
     class Meta:
         table = 'item_token_metadata'
 
-class PlaceTokenMetadata(BaseMetadata):
+
+class PlaceTokenMetadata(BaseTokenMetadata):
     place_type = fields.TextField(null=False)
     center_coordinates = fields.TextField(null=False)
     border_coordinates = fields.TextField(null=False)
@@ -105,6 +134,7 @@ class PlaceTokenMetadata(BaseMetadata):
 
     class Meta:
         table = 'place_token_metadata'
+
 
 # Token holders
 class ItemTokenHolder(Model):
@@ -117,6 +147,7 @@ class ItemTokenHolder(Model):
     class Meta:
         table = 'item_token_holder'
 
+
 class PlaceTokenHolder(Model):
     holder = fields.ForeignKeyField('models.Holder', 'holders_place_token', null=False, index=True)
     # NOTE: this will result in a field tokenId, which is the transient id, not the onchain id...
@@ -125,6 +156,7 @@ class PlaceTokenHolder(Model):
 
     class Meta:
         table = 'place_token_holder'
+
 
 # World
 class WorldItemPlacement(LevelledBaseTransient):
@@ -141,6 +173,7 @@ class WorldItemPlacement(LevelledBaseTransient):
     class Meta:
         table = 'world_item_placement'
         unique_together = ('chunk', 'item_id', 'place')
+
 
 # TODO:
 # class WorldFA2ItemPlacement
@@ -159,6 +192,7 @@ class ItemCollectionHistory(LevelledBaseTransient):
 
     class Meta:
         table = 'item_collection_history'
+
 
 # TODO:
 #class PlaceProps(LevelledBase):
@@ -186,6 +220,7 @@ class DutchAuction(LevelledBaseTransient):
         table = 'dutch_auction'
         unique_together = ('token_id', 'fa2', 'owner')
 
+
 # Whitelist
 class DutchAuctionWhitelist(Model):
     address = fields.CharField(max_length=36, pk=True)
@@ -200,12 +235,14 @@ class DutchAuctionWhitelist(Model):
     class Meta:
         table = 'dutch_auction_whitelist'
 
+
 # Tags
 class Tag(LevelledBaseTransient):
     name = fields.CharField(max_length=255, null=False, unique=True, index=True)
 
     class Meta:
         table = 'tag'
+
 
 class ItemTagMap(LevelledBaseTransient):
     item_metadata = fields.ForeignKeyField('models.ItemTokenMetadata', 'tag_map', null=False, index=True, on_delete=fields.CASCADE)

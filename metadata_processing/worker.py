@@ -9,7 +9,7 @@ import tortoise.transactions, tortoise.exceptions
 from metadata_processing import __version__
 from metadata_processing.config import Config
 from metadata_processing.gltf_validation import count_gltf_polygons
-from metadata_processing.models import ItemTagMap, ItemToken, ItemTokenMetadata, PlaceToken, PlaceTokenMetadata, MetadataStatus, Tag
+from metadata_processing.models import ItemTagMap, ItemToken, ItemTokenMetadata, PlaceToken, PlaceTokenMetadata, MetadataStatus, Tag, IpfsMetadataCache
 from metadata_processing.utils import getGridCellHash, getOrRaise
 
 
@@ -116,26 +116,32 @@ class MetadataProcessing:
 
 
     async def process_place_token(self, transient_id: int):
-        place_token = await PlaceToken.get(transient_id=transient_id)
-        self._logger.info(f'Processing Place token {place_token.token_id} ({place_token.contract})...')
+        place_token = await PlaceToken.get(transient_id=transient_id).prefetch_related("contract", "metadata")
+        self._logger.info(f'Processing Place token {place_token.token_id} ({place_token.contract.address})...')
 
-        # If we already have the metadata processed, use that.
-        place_token_metadata = await PlaceTokenMetadata.get_or_none(token_id=place_token.token_id, contract=place_token.contract)
-        if place_token_metadata is not None:
-            place_token.metadata_status = MetadataStatus.Valid.value
-            place_token.metadata = place_token_metadata
-            await place_token.save()
+        # Early out if token already has metadata.
+        if place_token.metadata is not None:
             return
 
         # to catch unspecified errors and mark token as failed.
         try:
-            metadata, _ = await self.ipfs_download_retry(place_token.metadata_uri, self._config.max_metadata_file_size)
+            # If we already have the metadata cached, use that.
+            metadata_cache = await IpfsMetadataCache.get_or_none(metadata_uri=place_token.metadata_uri)
 
-            if isinstance(metadata, bytes):
-                self._logger.error("metadata invalid: not json")
-                place_token.metadata_status = MetadataStatus.Invalid.value
-                await place_token.save()
-                return
+            if metadata_cache is not None:
+                metadata = metadata_cache.metadata_json
+                self._logger.info(f'Loaded ipfs metadata from cache: {place_token.metadata_uri}')
+            else:
+                metadata, _ = await self.ipfs_download_retry(place_token.metadata_uri, self._config.max_metadata_file_size)
+
+                if isinstance(metadata, bytes):
+                    self._logger.error("metadata invalid: not json")
+                    place_token.metadata_status = MetadataStatus.Invalid.value
+                    await place_token.save()
+                    return
+
+                await IpfsMetadataCache.update_or_create(metadata_uri=place_token.metadata_uri, defaults=dict(metadata_json=metadata))
+                self._logger.info(f'Cached ipfs metadata: {place_token.metadata_uri}')
 
             # required fields
             try:
@@ -158,8 +164,6 @@ class MetadataProcessing:
 
                 # TODO: maybe don't use create and get_or_create. something with transactions.
                 place_token_metadata = await PlaceTokenMetadata.create(
-                    token_id=place_token.token_id,
-                    contract=place_token.contract,
                     name=metadata.get('name', ''),
                     description=metadata.get('description', ''),
                     place_type=place_type,
@@ -175,35 +179,41 @@ class MetadataProcessing:
                 await place_token.save()
         # If it fails due to a transaction error, don't mark it as failed.
         except tortoise.exceptions.TransactionManagementError as e:
-            raise Exception(f'Transaction failed, Place token_id={place_token.token_id} contract={place_token.contract}: {e}') from e
+            raise Exception(f'Transaction failed, Place token_id={place_token.token_id} contract={place_token.contract.address}: {e}') from e
         # If it fails due to anything else, mark as failed and don't throw.
         except Exception as e:
-            self._logger.error(f'Failed to process Place token_id={place_token.token_id} contract={place_token.contract} metadata: {e}')
+            self._logger.error(f'Failed to process Place token_id={place_token.token_id} contract={place_token.contract.address} metadata: {e}')
             place_token.metadata_status = MetadataStatus.Failed.value
             await place_token.save()
 
 
     async def process_item_token(self, transient_id: int):
-        item_token = await ItemToken.get(transient_id=transient_id)
-        self._logger.info(f'Processing Item token {item_token.token_id} ({item_token.contract})...')
+        item_token = await ItemToken.get(transient_id=transient_id).prefetch_related("contract", "metadata")
+        self._logger.info(f'Processing Item token {item_token.token_id} ({item_token.contract.address})...')
 
-        # If we already have the metadata processed, use that.
-        item_token_metadata = await ItemTokenMetadata.get_or_none(token_id=item_token.token_id, contract=item_token.contract)
-        if item_token_metadata is not None:
-            item_token.metadata_status = MetadataStatus.Valid.value
-            item_token.metadata = item_token_metadata
-            await item_token.save()
+        # Early out if token already has metadata.
+        if item_token.metadata is not None:
             return
 
         # to catch unspecified errors and mark token as failed.
         try:
-            metadata, _ = await self.ipfs_download_retry(item_token.metadata_uri, self._config.max_metadata_file_size)
+            # If we already have the metadata cached, use that.
+            metadata_cache = await IpfsMetadataCache.get_or_none(metadata_uri=item_token.metadata_uri)
 
-            if isinstance(metadata, bytes):
-                self._logger.error("metadata invalid: not json")
-                item_token.metadata_status = MetadataStatus.Invalid.value
-                await item_token.save()
-                return
+            if metadata_cache is not None:
+                metadata = metadata_cache.metadata_json
+                self._logger.info(f'Loaded ipfs metadata from cache: {item_token.metadata_uri}')
+            else:
+                metadata, _ = await self.ipfs_download_retry(item_token.metadata_uri, self._config.max_metadata_file_size)
+
+                if isinstance(metadata, bytes):
+                    self._logger.error("metadata invalid: not json")
+                    item_token.metadata_status = MetadataStatus.Invalid.value
+                    await item_token.save()
+                    return
+
+                await IpfsMetadataCache.update_or_create(metadata_uri=item_token.metadata_uri, defaults=dict(metadata_json=metadata))
+                self._logger.info(f'Cached ipfs metadata: {item_token.metadata_uri}')
 
             # required fields
             try:
@@ -247,7 +257,7 @@ class MetadataProcessing:
             try:
                 # Check file size
                 if artifact_size != file_size:
-                    raise Exception(f'file size does not match metadata, token_id={item_token.token_id} contract={item_token.contract}')
+                    raise Exception(f'file size does not match metadata, token_id={item_token.token_id} contract={item_token.contract.address}')
 
                 counted_polygons = count_gltf_polygons(artifact)
 
@@ -256,10 +266,10 @@ class MetadataProcessing:
                 # error precision is upto 2 decimal places
                 maxDiff = polygon_count * self._config.polygon_count_error / 10000.00
                 if diff > maxDiff:
-                    raise Exception(f'polycount > max diff, token_id={item_token.token_id} contract={item_token.contract} expected_count={polygon_count}, got_count={counted_polygons}')
+                    raise Exception(f'polycount > max diff, token_id={item_token.token_id} contract={item_token.contract.address} expected_count={polygon_count}, got_count={counted_polygons}')
 
                 if diff != 0:
-                    self._logger.warn(f'polycount did not match, token_id={item_token.token_id} contract={item_token.contract}, expected_count={polygon_count}, got_count={counted_polygons}, diff={diff}')
+                    self._logger.warn(f'polycount did not match, token_id={item_token.token_id} contract={item_token.contract.address}, expected_count={polygon_count}, got_count={counted_polygons}, diff={diff}')
             except Exception as e:
                 self._logger.error(f'model invalid: {e}')
                 item_token.metadata_status = MetadataStatus.Invalid.value
@@ -273,8 +283,6 @@ class MetadataProcessing:
 
                 # TODO: maybe don't use create and get_or_create. something with transactions.
                 item_token_metadata = await ItemTokenMetadata.create(
-                    token_id=item_token.token_id,
-                    contract=item_token.contract,
                     name=metadata.get('name', ''),
                     description=metadata.get('description', ''),
                     artifact_uri=artifact_uri,
@@ -304,10 +312,10 @@ class MetadataProcessing:
                         timestamp=item_token.timestamp)
         # If it fails due to a transaction error, don't mark it as failed.
         except tortoise.exceptions.TransactionManagementError as e:
-            raise Exception(f'Transaction failed, Item token_id={item_token.token_id} contract={item_token.contract}: {e}') from e
+            raise Exception(f'Transaction failed, Item token_id={item_token.token_id} contract={item_token.contract.address}: {e}') from e
         # If it fails due to anything else, mark as failed and don't throw.
         except Exception as e:
-            self._logger.error(f'Failed to process Item token_id={item_token.token_id} contract={item_token.contract} metadata: {e}')
+            self._logger.error(f'Failed to process Item token_id={item_token.token_id} contract={item_token.contract.address} metadata: {e}')
             item_token.metadata_status = MetadataStatus.Failed.value
             await item_token.save()
 
