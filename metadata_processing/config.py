@@ -23,6 +23,8 @@ class Config:
         self.max_metadata_file_size: int = 10000 # default 10000
         self.max_artifact_file_size: int = 67108864 # default 67108864
 
+        self.startup_wait_time: float = 30.0 # in seconds
+
         db_password: str = environ.get('POSTGRES_PASSWORD', 'changeme')
 
         if self.env == 'production':
@@ -53,12 +55,15 @@ class Config:
             self.db_connection_url: str = f'postgres://dipdup:{db_password}@db-dipdup:15435/dipdup'
             #self.db_connection_url = 'sqlite://../tezland-indexer/landex.sqlite3'
             #self.db_connection_url = 'sqlite://db.sqlite3'
+            #self.startup_wait_time = 0.0
 
             self.ipfs_gateways: list[str] = [
                 'http://ipfs:8080'
+                #'http://localhost:8080'
             ]
 
             self.ipfs_fallback_gateway: str = 'http://ipfs:8080'
+            #self.ipfs_fallback_gateway: str = 'http://localhost:8080'
         elif self.env == 'test':
             self.db_connection_url: str = f'sqlite://:memory:'
 

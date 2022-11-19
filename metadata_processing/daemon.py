@@ -38,9 +38,8 @@ async def token_processing_task(config: Config):
 
     # Wait for database online.
     try:
-        wait_time = 30
-        _logger.info(f'Waiting {wait_time} seconds before startup')
-        await asyncio.sleep(wait_time)
+        _logger.info(f'Waiting {config.startup_wait_time} seconds before startup')
+        await asyncio.sleep(config.startup_wait_time)
         await wait_for_database_online(config)
     except asyncio.CancelledError:
         _logger.info("Shutdown requested")
