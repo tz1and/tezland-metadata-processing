@@ -36,13 +36,18 @@ async def token_processing_task(config: Config):
     item_cursor = Cursor(ItemToken)
     place_cursor = Cursor(PlaceToken)
 
+    # Wait for database online.
     try:
         wait_time = 30
         _logger.info(f'Waiting {wait_time} seconds before startup')
         await asyncio.sleep(wait_time)
-
         await wait_for_database_online(config)
+    except asyncio.CancelledError:
+        _logger.info("Shutdown requested")
+        return
 
+    # Then start processing.
+    try:
         processing = MetadataProcessing(config)
         await processing.init()
 
