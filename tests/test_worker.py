@@ -5,7 +5,7 @@ from datetime import datetime
 from metadata_processing.config import Config
 
 from metadata_processing.worker import MetadataProcessing, TokenType
-from metadata_processing.models import ItemToken, Holder, ItemTokenMetadata, MetadataStatus, PlaceToken, PlaceTokenMetadata
+from metadata_processing.models import ItemToken, Holder, MetadataStatus, PlaceToken, PlaceContract, ItemContract
 
 
 class TestMetadataProcessing(test.TestCase):
@@ -30,6 +30,8 @@ class TestMetadataProcessing(test.TestCase):
 
     async def create_test_db(self):
         minter = await Holder.create(address="minter")
+        self.place_contract = await PlaceContract.create(address="placecontract", level=0, timestamp=0)
+        self.item_contract = await ItemContract.create(address="itemcontract", level=0, timestamp=0)
 
         invalid_ipfs_uri = "ipfs://bafktestinvalidtestinvalidtestinvalidtestinvalidtestinvalid"
         invalid_metadata = "ipfs://QmfXz1ibFh1B24RqFyv49AyMNeNqhuhP815aXzEYswcsSU"
@@ -37,7 +39,9 @@ class TestMetadataProcessing(test.TestCase):
 
         async def create_item(id, link):
             await ItemToken.create(
-                id=id,
+                transient_id=id,
+                contract=self.item_contract,
+                token_id=id,
                 royalties=10,
                 minter=minter,
                 metadata_uri=link,
@@ -47,7 +51,9 @@ class TestMetadataProcessing(test.TestCase):
 
         async def create_place(id, link):
             await PlaceToken.create(
-                id=id,
+                transient_id=id,
+                contract=self.place_contract,
+                token_id=id,
                 minter=minter,
                 metadata_uri=link,
                 level=1,
@@ -73,54 +79,63 @@ class TestMetadataProcessing(test.TestCase):
     async def test_invalid_item_metadata_link(self):
         """Test invalid item metadata link"""
         await self.processing.process_token((TokenType.Item, 1))
-        self.assertEqual((await ItemToken.get(id=1)).metadata_status, MetadataStatus.Failed.value)
-        self.assertIsNone(await ItemTokenMetadata.get_or_none(id=1))
+        print("got here!!")
+        item_token: ItemToken = await ItemToken.get(transient_id=1).prefetch_related("metadata")
+        self.assertEqual(item_token.metadata_status, MetadataStatus.Failed.value)
+        self.assertIsNone(item_token.metadata)
 
 
     async def test_invalid_place_metadata_link(self):
         """Test invalid place metadata link"""
         await self.processing.process_token((TokenType.Place, 1))
-        self.assertEqual((await PlaceToken.get(id=1)).metadata_status, MetadataStatus.Failed.value)
-        self.assertIsNone(await PlaceTokenMetadata.get_or_none(id=1))
+        place_token: PlaceToken = await PlaceToken.get(transient_id=1).prefetch_related("metadata")
+        self.assertEqual(place_token.metadata_status, MetadataStatus.Failed.value)
+        self.assertIsNone(place_token.metadata)
 
 
     async def test_valid_item_metadata(self):
         """Test valid item metadata"""
         await self.processing.process_token((TokenType.Item, 2))
-        self.assertEqual((await ItemToken.get(id=2)).metadata_status, MetadataStatus.Valid.value)
-        self.assertIsNotNone(await ItemTokenMetadata.get_or_none(id=2))
+        item_token: ItemToken = await ItemToken.get(transient_id=2).prefetch_related("metadata")
+        self.assertEqual(item_token.metadata_status, MetadataStatus.Valid.value)
+        self.assertIsNotNone(item_token.metadata)
 
 
     async def test_valid_place_metadata(self):
         """Test valid place metadata"""
         await self.processing.process_token((TokenType.Place, 2))
-        self.assertEqual((await PlaceToken.get(id=2)).metadata_status, MetadataStatus.Valid.value)
-        self.assertIsNotNone(await PlaceTokenMetadata.get_or_none(id=2))
+        place_token: PlaceToken = await PlaceToken.get(transient_id=2).prefetch_related("metadata")
+        self.assertEqual(place_token.metadata_status, MetadataStatus.Valid.value)
+        self.assertIsNotNone(place_token.metadata)
 
 
     async def test_invalid_item_metadata(self):
         """Test invalid place metadata"""
         await self.processing.process_token((TokenType.Item, 3))
-        self.assertEqual((await ItemToken.get(id=3)).metadata_status, MetadataStatus.Invalid.value)
-        self.assertIsNone(await ItemTokenMetadata.get_or_none(id=3))
+        item_token: ItemToken = await ItemToken.get(transient_id=3).prefetch_related("metadata")
+        self.assertEqual(item_token.metadata_status, MetadataStatus.Invalid.value)
+        self.assertIsNone(item_token.metadata)
 
 
     async def test_invalid_place_metadata(self):
         """Test invalid place metadata"""
         await self.processing.process_token((TokenType.Place, 3))
-        self.assertEqual((await PlaceToken.get(id=3)).metadata_status, MetadataStatus.Invalid.value)
-        self.assertIsNone(await PlaceTokenMetadata.get_or_none(id=3))
+        place_token: PlaceToken = await PlaceToken.get(transient_id=3).prefetch_related("metadata")
+        self.assertEqual(place_token.metadata_status, MetadataStatus.Invalid.value)
+        self.assertIsNone(place_token.metadata)
 
 
     async def test_not_item_metadata(self):
         """Test not place metadata"""
         await self.processing.process_token((TokenType.Item, 4))
-        self.assertEqual((await ItemToken.get(id=4)).metadata_status, MetadataStatus.Invalid.value)
-        self.assertIsNone(await ItemTokenMetadata.get_or_none(id=4))
+        item_token: ItemToken = await ItemToken.get(transient_id=4).prefetch_related("metadata")
+        self.assertEqual(item_token.metadata_status, MetadataStatus.Invalid.value)
+        self.assertIsNone(item_token.metadata)
 
 
     async def test_not_place_metadata(self):
         """Test not place metadata"""
         await self.processing.process_token((TokenType.Place, 4))
-        self.assertEqual((await PlaceToken.get(id=4)).metadata_status, MetadataStatus.Invalid.value)
-        self.assertIsNone(await PlaceTokenMetadata.get_or_none(id=4))
+        place_token: PlaceToken = await PlaceToken.get(transient_id=4).prefetch_related("metadata")
+        self.assertEqual(place_token.metadata_status, MetadataStatus.Invalid.value)
+        self.assertIsNone(place_token.metadata)

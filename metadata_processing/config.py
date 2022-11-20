@@ -26,10 +26,10 @@ class Config:
         self.startup_wait_time: float = 30.0 # in seconds
 
         db_password: str = environ.get('POSTGRES_PASSWORD', 'changeme')
+        # TODO: ?maxsize=1 fixes transaction failiures.
+        self.db_connection_url: str = f'postgres://dipdup:{db_password}@db-dipdup:15435/dipdup'
 
         if self.env == 'production':
-            self.db_connection_url: str = f'postgres://dipdup:{db_password}@db-dipdup:15435/dipdup'
-
             self.ipfs_gateways: list[str] = [
                 'https://ipfs.io',
                 'https://cloudflare-ipfs.com',
@@ -40,8 +40,6 @@ class Config:
 
             self.ipfs_fallback_gateway: str = 'http://backend-ipfs:8080'
         elif self.env == 'staging':
-            self.db_connection_url: str = f'postgres://dipdup:{db_password}@db-dipdup:15435/dipdup'
-
             self.ipfs_gateways: list[str] = [
                 'https://ipfs.io',
                 'https://cloudflare-ipfs.com',
@@ -52,7 +50,6 @@ class Config:
 
             self.ipfs_fallback_gateway: str = 'http://ipfs:8080'
         elif self.env == 'development':
-            self.db_connection_url: str = f'postgres://dipdup:{db_password}@db-dipdup:15435/dipdup'
             #self.db_connection_url = 'sqlite://../tezland-indexer/landex.sqlite3'
             #self.db_connection_url = 'sqlite://db.sqlite3'
             #self.startup_wait_time = 0.0
