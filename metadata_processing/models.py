@@ -37,16 +37,21 @@ class LevelledBase(Model):
 
 
 # Contracts
-class PlaceContract(LevelledBaseTransient):
+class BaseContract(LevelledBaseTransient):
     address = fields.CharField(max_length=36, index=True)
 
+    # TODO: contract metadata
+
+    class Meta:
+        abstract = True
+
+
+class PlaceContract(BaseContract):
     class Meta:
         table = 'place_contract'
 
 
-class ItemContract(LevelledBaseTransient):
-    address = fields.CharField(max_length=36, index=True)
-
+class ItemContract(BaseContract):
     class Meta:
         table = 'item_contract'
 
@@ -103,7 +108,7 @@ class IpfsMetadataCache(Model):
         table = 'ipfs_metadata_cache'
 
 
-class BaseTokenMetadata(LevelledBaseTransient):
+class BaseMetadata(LevelledBaseTransient):
     name = fields.TextField(default='')
     description = fields.TextField(default='')
 
@@ -111,7 +116,7 @@ class BaseTokenMetadata(LevelledBaseTransient):
         abstract = True
 
 
-class ItemTokenMetadata(BaseTokenMetadata):
+class ItemTokenMetadata(BaseMetadata):
     artifact_uri = fields.TextField(null=False)
     thumbnail_uri = fields.TextField(null=True)
     display_uri = fields.TextField(null=True)
@@ -125,7 +130,7 @@ class ItemTokenMetadata(BaseTokenMetadata):
         table = 'item_token_metadata'
 
 
-class PlaceTokenMetadata(BaseTokenMetadata):
+class PlaceTokenMetadata(BaseMetadata):
     place_type = fields.TextField(null=False)
     center_coordinates = fields.TextField(null=False)
     border_coordinates = fields.TextField(null=False)
