@@ -14,6 +14,9 @@ from metadata_processing.models import ItemTagMap, ItemToken, ItemTokenMetadata,
 from metadata_processing.utils import getGridCellHash, getOrRaise
 
 
+# TODO: add retry logic in process_*. 5-10 if failed. if invalid just stop retrying.
+
+
 IPFS_PREFIX = 'ipfs://'
 
 
@@ -32,7 +35,7 @@ class MetadataProcessing:
 
     @property
     def user_agent(self) -> str:
-        """Return User-Agent header compiled from aiohttp's one and dipdup environment"""
+        """Return User-Agent header compiled from aiohttp's one and metdata-processing environment"""
         if self._user_agent is None:
             user_agent_args = (platform.system(), platform.machine())
             user_agent = f'metdata-processing/{__version__} ({"; ".join(user_agent_args)})'
@@ -295,8 +298,7 @@ class MetadataProcessing:
                 for tag_name in tags:
                     tag, _ = await Tag.get_or_create(name=tag_name, defaults={
                         'level': item_token.level,
-                        'timestamp': item_token.timestamp
-                    })
+                        'timestamp': item_token.timestamp})
 
                     await ItemTagMap.create(
                         item_metadata=item_token_metadata,
