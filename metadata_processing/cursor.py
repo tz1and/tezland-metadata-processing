@@ -7,23 +7,24 @@ _logger = logging.getLogger('Cursor')
 
 
 class Cursor:
-    def __init__(self, model_class):
+    def __init__(self, model_class, order_by='transient_id'):
         self.model_class = model_class
         self.current = None
+        self.order_by = order_by
 
     async def next(self) -> Model:
         if self.current is None:
             next = await self.model_class.filter(
-                transient_id__gte=0,
+                **{f'{self.order_by}__gte': 0},
                 #transient_id__lt=20,
                 metadata_status=MetadataStatus.New.value
-            ).order_by('transient_id').first()
+            ).order_by(self.order_by).first()
         else:
             next = await self.model_class.filter(
-                transient_id__gt=self.current.transient_id,
+                **{f'{self.order_by}__gt': getattr(self.current, self.order_by)},
                 #transient_id__lt=20,
                 metadata_status=MetadataStatus.New.value
-            ).order_by('transient_id').first()
+            ).order_by(self.order_by).first()
 
         if next is not None:
             self.current = next

@@ -1,9 +1,16 @@
 #from datetime import datetime
 from enum import Enum, unique
 from tortoise import Model, fields
+#from tortoise import fields
+#from dipdup.models import Model
 
 
-# TODO: whitelist for different place types.
+@unique
+class MetadataStatus(Enum):
+    New = 0
+    Valid = 1
+    Failed = 2
+    Invalid = 3
 
 
 # TODO: probably shouldn't be called holder?
@@ -42,35 +49,28 @@ class LevelledBase(Model):
         abstract = True
 
 
-# Contracts
-class BaseContract(LevelledBaseTransient):
-    address = fields.CharField(max_length=36, index=True)
-
-    # TODO: contract metadata
+# Levelled base where no pk is provided
+class LevelledBaseNoPk(Model):
+    level = fields.BigIntField(null=False)
+    timestamp = fields.DatetimeField(null=False)
 
     class Meta:
         abstract = True
 
 
-class PlaceContract(BaseContract):
-    class Meta:
-        table = 'place_contract'
+# Contracts
+class Contract(LevelledBaseNoPk):
+    address = fields.CharField(max_length=36, pk=True)
 
+    metadata_uri = fields.TextField(null=False)
+    metadata_status = fields.BigIntField(default=int(MetadataStatus.New.value))
+    metadata = fields.OneToOneField('models.ContractMetadata', 'contract', null=True)
 
-class ItemContract(BaseContract):
     class Meta:
-        table = 'item_contract'
+        table = 'contact'
 
 
 # Tokens
-@unique
-class MetadataStatus(Enum):
-    New = 0
-    Valid = 1
-    Failed = 2
-    Invalid = 3
-
-
 class BaseToken(LevelledBaseTransient):
     token_id = fields.BigIntField(null=False, index=True)
 
@@ -82,7 +82,7 @@ class BaseToken(LevelledBaseTransient):
 
 
 class ItemToken(BaseToken):
-    contract = fields.ForeignKeyField('models.ItemContract', 'item_tokens', null=False, index=True)
+    contract = fields.ForeignKeyField('models.Contract', 'item_tokens', null=False, index=True)
     minter = fields.ForeignKeyField('models.Holder', 'item_tokens', null=False, index=True)
     royalties = fields.SmallIntField(default=0)
     supply = fields.BigIntField(default=0)
@@ -95,7 +95,7 @@ class ItemToken(BaseToken):
 
 
 class PlaceToken(BaseToken):
-    contract = fields.ForeignKeyField('models.PlaceContract', 'place_tokens', null=False, index=True)
+    contract = fields.ForeignKeyField('models.Contract', 'place_tokens', null=False, index=True)
     minter = fields.ForeignKeyField('models.Holder', 'place_tokens', null=False, index=True)
 
     metadata = fields.OneToOneField('models.PlaceTokenMetadata', 'token', null=True)
@@ -147,6 +147,11 @@ class PlaceTokenMetadata(BaseMetadata):
         table = 'place_token_metadata'
 
 
+class ContractMetadata(BaseMetadata):
+    class Meta:
+        table = 'contract_metadata'
+
+
 # Token holders
 class ItemTokenHolder(Model):
     holder = fields.ForeignKeyField('models.Holder', 'holders_item_token', null=False, index=True)
@@ -182,6 +187,16 @@ class WorldItemPlacement(LevelledBaseTransient):
     class Meta:
         table = 'world_item_placement'
         unique_together = ('chunk', 'item_id', 'place')
+
+class PlacePermissions(LevelledBaseTransient):
+    place = fields.ForeignKeyField('models.PlaceToken', 'permissions', null=False, index=True)
+    owner = fields.ForeignKeyField('models.Holder', 'given_permissions', null=False, index=True)
+    permittee = fields.ForeignKeyField('models.Holder', 'held_permissions', null=False, index=True)
+    premissions = fields.SmallIntField(default=0)
+
+    class Meta:
+        table = 'place_permissions'
+        unique_together = ('place_id', 'owner_id', 'permittee_id')
 
 
 # TODO:
@@ -227,22 +242,36 @@ class DutchAuction(LevelledBaseTransient):
 
     class Meta:
         table = 'dutch_auction'
-        unique_together = ('token_id', 'fa2', 'owner')
+        # Note: auctions should not be unique on these, because finished auctions
+        # are kept around for history.
+        # NOTE: should maybe put them into another table: DutchAuctionFinished
+        # and keep the unique constraint?
+        #unique_together = ('token_id', 'fa2', 'owner')
 
 
-# Whitelist
-class DutchAuctionWhitelist(Model):
+# Whitelists
+class DutchAuctionWhitelistV1(Model):
     address = fields.CharField(max_length=36, pk=True)
     current_status = fields.BooleanField(default=False)
     added_count = fields.IntField(default=0)
     removed_count = fields.IntField(default=0)
     used_count = fields.IntField(default=0)
 
-    #level = fields.BigIntField(default=0)
-    #timestamp = fields.DatetimeField(null=False)
+    class Meta:
+        table = 'dutch_auction_whitelist_v1'
+
+class DutchAuctionWhitelist(Model):
+    id = fields.BigIntField(pk=True)
+    fa2 = fields.CharField(max_length=36, index=True)
+    address = fields.CharField(max_length=36, index=True)
+    current_status = fields.BooleanField(default=False)
+    added_count = fields.IntField(default=0)
+    removed_count = fields.IntField(default=0)
+    used_count = fields.IntField(default=0)
 
     class Meta:
         table = 'dutch_auction_whitelist'
+        unique_together = ('fa2', 'address')
 
 
 # Tags

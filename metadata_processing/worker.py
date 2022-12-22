@@ -10,7 +10,7 @@ import tortoise.transactions, tortoise.exceptions
 from metadata_processing import __version__
 from metadata_processing.config import Config
 from metadata_processing.gltf_validation import count_gltf_polygons
-from metadata_processing.models import ItemTagMap, ItemToken, ItemTokenMetadata, PlaceToken, PlaceTokenMetadata, MetadataStatus, Tag, IpfsMetadataCache, BaseToken
+from metadata_processing.models import ItemTagMap, ItemToken, ItemTokenMetadata, PlaceToken, PlaceTokenMetadata, MetadataStatus, Tag, IpfsMetadataCache, BaseToken, Contract, ContractMetadata
 from metadata_processing.utils import getGridCellHash, getOrRaise
 
 
@@ -21,9 +21,10 @@ IPFS_PREFIX = 'ipfs://'
 
 
 @unique
-class TokenType(Enum):
+class MetadataType(Enum):
     Item = 0
     Place = 1
+    Contract = 2
 
 
 class MetadataProcessing:
@@ -119,7 +120,7 @@ class MetadataProcessing:
         raise Exception(f'IPFS download failed after {attempt} retries.')
 
 
-    async def download_and_cache_token_metadata(self, token: BaseToken) -> Any:
+    async def download_and_cache_metadata(self, token: BaseToken | Contract) -> Any:
         # transaction for metadata cache
         async with tortoise.transactions.in_transaction():
             # If we already have the metadata cached, use that.
@@ -142,9 +143,56 @@ class MetadataProcessing:
 
             return metadata
 
+    
+    async def process_contract(self, address: str):
+        contract: Contract = await Contract.get(address=address).prefetch_related("metadata")
+        self._logger.info(f'Processing Contract {contract.address}...')
+
+        # Early out if contract already has metadata.
+        if contract.metadata is not None:
+            return
+
+        # to catch unspecified errors and mark token as failed.
+        try:
+            metadata = await self.download_and_cache_metadata(contract)
+
+            # required fields
+            try:
+                name = getOrRaise(metadata, 'name')
+                description = getOrRaise(metadata, 'description')
+            except Exception as e:
+                self._logger.error(f'required fields: {e}')
+                contract.metadata_status = MetadataStatus.Invalid.value
+                await contract.save()
+                return
+
+            # transaction for creating metadata, saving place
+            async with tortoise.transactions.in_transaction():
+                # refresh from DB in case the thing has been deleted.
+                await contract.refresh_from_db()
+
+                # TODO: maybe don't use create and get_or_create. something with transactions.
+                place_token_metadata = await ContractMetadata.create(
+                    name=name,
+                    description=description,
+                    level=contract.level,
+                    timestamp=contract.timestamp)
+
+                contract.metadata_status = MetadataStatus.Valid.value
+                contract.metadata = place_token_metadata
+                await contract.save()
+        # If it fails due to a transaction error, don't mark it as failed.
+        except tortoise.exceptions.TransactionManagementError as e:
+            raise Exception(f'Transaction failed, Contract address={contract.address}: {e}') from e
+        # If it fails due to anything else, mark as failed and don't throw.
+        except Exception as e:
+            self._logger.error(f'Failed to process Contract address={contract.address} metadata: {e}')
+            contract.metadata_status = MetadataStatus.Failed.value
+            await contract.save()
+
 
     async def process_place_token(self, transient_id: int):
-        place_token = await PlaceToken.get(transient_id=transient_id).prefetch_related("contract", "metadata")
+        place_token: PlaceToken = await PlaceToken.get(transient_id=transient_id).prefetch_related("contract", "metadata")
         self._logger.info(f'Processing Place token {place_token.token_id} ({place_token.contract.address})...')
 
         # Early out if token already has metadata.
@@ -153,7 +201,7 @@ class MetadataProcessing:
 
         # to catch unspecified errors and mark token as failed.
         try:
-            metadata = await self.download_and_cache_token_metadata(place_token)
+            metadata = await self.download_and_cache_metadata(place_token)
 
             # required fields
             try:
@@ -200,7 +248,7 @@ class MetadataProcessing:
 
 
     async def process_item_token(self, transient_id: int):
-        item_token = await ItemToken.get(transient_id=transient_id).prefetch_related("contract", "metadata")
+        item_token: ItemToken = await ItemToken.get(transient_id=transient_id).prefetch_related("contract", "metadata")
         self._logger.info(f'Processing Item token {item_token.token_id} ({item_token.contract.address})...')
 
         # Early out if token already has metadata.
@@ -209,7 +257,7 @@ class MetadataProcessing:
 
         # to catch unspecified errors and mark token as failed.
         try:
-            metadata = await self.download_and_cache_token_metadata(item_token)
+            metadata = await self.download_and_cache_metadata(item_token)
 
             # required fields
             try:
@@ -315,17 +363,19 @@ class MetadataProcessing:
             await item_token.save()
 
 
-    async def process_token(self, token: tuple[TokenType, int]):
+    async def process_metadata(self, token: tuple[MetadataType, int | str]):
         try:
-            token_type = token[0]
-            transient_id = token[1]
+            metadata_type = token[0]
+            metadata_id = token[1]
 
-            if token_type is TokenType.Item:
-                await self.process_item_token(transient_id)
-            elif token_type is TokenType.Place:
-                await self.process_place_token(transient_id)
+            if metadata_type is MetadataType.Item:
+                await self.process_item_token(metadata_id)
+            elif metadata_type is MetadataType.Place:
+                await self.process_place_token(metadata_id)
+            elif metadata_type is MetadataType.Contract:
+                await self.process_contract(metadata_id)
             else:
-                raise Exception(f'Unknown token type "{token_type}", can\'t process metadata')
+                raise Exception(f'Unknown metadata type "{metadata_type}", can\'t process')
         except Exception as e:
             message = f'Failed to process token: {e}'
             self._logger.error(message)

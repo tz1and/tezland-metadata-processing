@@ -7,8 +7,8 @@ from tortoise import Tortoise, connections
 from metadata_processing.config import Config
 from metadata_processing.cursor import Cursor
 from metadata_processing.task_pool import TaskPool
-from metadata_processing.worker import MetadataProcessing, TokenType
-from metadata_processing.models import ItemToken, PlaceToken
+from metadata_processing.worker import MetadataProcessing, MetadataType
+from metadata_processing.models import ItemToken, PlaceToken, Contract
 
 _logger = logging.getLogger('deamon')
 
@@ -35,6 +35,7 @@ async def wait_for_database_online(config: Config):
 async def token_processing_task(config: Config):
     item_cursor = Cursor(ItemToken)
     place_cursor = Cursor(PlaceToken)
+    contract_cursor = Cursor(Contract, 'address')
 
     # Wait for database online.
     try:
@@ -62,18 +63,24 @@ async def token_processing_task(config: Config):
                 next_item = await item_cursor.next()
                 if next_item is not None:
                     pending_tasks += 1
-                    task_pool.submit(asyncio.create_task(processing.process_token((TokenType.Item, next_item.transient_id)))).add_done_callback(decrementPending)
+                    task_pool.submit(asyncio.create_task(processing.process_metadata((MetadataType.Item, next_item.transient_id)))).add_done_callback(decrementPending)
 
                 next_place = await place_cursor.next()
                 if next_place is not None:
                     pending_tasks += 1
-                    task_pool.submit(asyncio.create_task(processing.process_token((TokenType.Place, next_place.transient_id)))).add_done_callback(decrementPending)
+                    task_pool.submit(asyncio.create_task(processing.process_metadata((MetadataType.Place, next_place.transient_id)))).add_done_callback(decrementPending)
+
+                next_contract = await contract_cursor.next()
+                if next_contract is not None:
+                    pending_tasks += 1
+                    task_pool.submit(asyncio.create_task(processing.process_metadata((MetadataType.Contract, next_contract.address)))).add_done_callback(decrementPending)
 
                 if next_item is None and next_place is None:
                     # reset cursors to starting position if all tasks done
                     if pending_tasks <= 0:
                         item_cursor.reset()
                         place_cursor.reset()
+                        contract_cursor.reset()
                     break
         
             await asyncio.sleep(1)
