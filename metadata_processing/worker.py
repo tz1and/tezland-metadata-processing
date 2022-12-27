@@ -10,7 +10,7 @@ import tortoise.transactions, tortoise.exceptions
 from metadata_processing import __version__
 from metadata_processing.config import Config
 from metadata_processing.gltf_validation import count_gltf_polygons
-from metadata_processing.models import ItemTagMap, ItemToken, ItemTokenMetadata, PlaceToken, PlaceTokenMetadata, MetadataStatus, Tag, IpfsMetadataCache, BaseToken, Contract, ContractMetadata
+from metadata_processing.models import ContractTagMap, ItemTagMap, ItemToken, ItemTokenMetadata, PlaceToken, PlaceTokenMetadata, MetadataStatus, Tag, IpfsMetadataCache, BaseToken, Contract, ContractMetadata
 from metadata_processing.utils import getGridCellHash, getOrRaise
 
 
@@ -166,21 +166,45 @@ class MetadataProcessing:
                 await contract.save()
                 return
 
+            # Optional fields.
+            user_description = metadata.get('userDescription')
+            # Split tags by comma as well. Because people are people...
+            tags: list[str] = []
+            metadata_tags: list[str] | None = metadata.get('tags')
+            if metadata_tags is not None:
+                for tag in metadata_tags:
+                    for split in tag.split(','):
+                        stripped = split.strip()
+                        if len(stripped) > 0:
+                            tags.append(stripped.lower())
+
             # transaction for creating metadata, saving place
             async with tortoise.transactions.in_transaction():
                 # refresh from DB in case the thing has been deleted.
                 await contract.refresh_from_db()
 
                 # TODO: maybe don't use create and get_or_create. something with transactions.
-                place_token_metadata = await ContractMetadata.create(
+                contract_metadata = await ContractMetadata.create(
                     name=name,
                     description=description,
+                    user_description=user_description,
                     level=contract.level,
                     timestamp=contract.timestamp)
 
                 contract.metadata_status = MetadataStatus.Valid.value
-                contract.metadata = place_token_metadata
+                contract.metadata = contract_metadata
                 await contract.save()
+
+                for tag_name in tags:
+                    tag, _ = await Tag.get_or_create(name=tag_name, defaults={
+                        'level': contract.level,
+                        'timestamp': contract.timestamp})
+
+                    await ContractTagMap.create(
+                        contract_metadata=contract_metadata,
+                        tag=tag,
+                        level=contract.level,
+                        timestamp=contract.timestamp)
         # If it fails due to a transaction error, don't mark it as failed.
         except tortoise.exceptions.TransactionManagementError as e:
             raise Exception(f'Transaction failed, Contract address={contract.address}: {e}') from e
