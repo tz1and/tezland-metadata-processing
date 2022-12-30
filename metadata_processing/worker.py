@@ -152,6 +152,16 @@ class MetadataProcessing:
         if contract.metadata is not None:
             return
 
+        # TODO: NOTE: have another MetadataStatus Refresh?
+        # If we already have metadata for this token, use it.
+        existing_metadata = await ContractMetadata.get_or_none(address=contract.address)
+        if existing_metadata is not None:
+            self._logger.info(f'Using existing metadata for Contract {contract.address}.')
+            contract.metadata_status = MetadataStatus.Valid.value
+            contract.metadata = existing_metadata
+            await contract.save()
+            return
+
         # to catch unspecified errors and mark token as failed.
         try:
             metadata = await self.download_and_cache_metadata(contract)
@@ -185,6 +195,7 @@ class MetadataProcessing:
 
                 # TODO: maybe don't use create and get_or_create. something with transactions.
                 contract_metadata = await ContractMetadata.create(
+                    address=contract.address,
                     name=name,
                     description=description,
                     user_description=user_description,
@@ -223,6 +234,15 @@ class MetadataProcessing:
         if place_token.metadata is not None:
             return
 
+        # If we already have metadata for this token, use it.
+        existing_metadata = await PlaceTokenMetadata.get_or_none(contract=place_token.contract.address, token_id=place_token.token_id)
+        if existing_metadata is not None:
+            self._logger.info(f'Using existing metadata for Place token {place_token.token_id} ({place_token.contract.address}).')
+            place_token.metadata_status = MetadataStatus.Valid.value
+            place_token.metadata = existing_metadata
+            await place_token.save()
+            return
+
         # to catch unspecified errors and mark token as failed.
         try:
             metadata = await self.download_and_cache_metadata(place_token)
@@ -248,6 +268,8 @@ class MetadataProcessing:
 
                 # TODO: maybe don't use create and get_or_create. something with transactions.
                 place_token_metadata = await PlaceTokenMetadata.create(
+                    contract=place_token.contract.address,
+                    token_id=place_token.token_id,
                     name=metadata.get('name', ''),
                     description=metadata.get('description', ''),
                     place_type=place_type,
@@ -277,6 +299,15 @@ class MetadataProcessing:
 
         # Early out if token already has metadata.
         if item_token.metadata is not None:
+            return
+
+        # If we already have metadata for this token, use it.
+        existing_metadata = await ItemTokenMetadata.get_or_none(contract=item_token.contract.address, token_id=item_token.token_id)
+        if existing_metadata is not None:
+            self._logger.info(f'Using existing metadata for Item token {item_token.token_id} ({item_token.contract.address}).')
+            item_token.metadata_status = MetadataStatus.Valid.value
+            item_token.metadata = existing_metadata
+            await item_token.save()
             return
 
         # to catch unspecified errors and mark token as failed.
@@ -351,6 +382,8 @@ class MetadataProcessing:
 
                 # TODO: maybe don't use create and get_or_create. something with transactions.
                 item_token_metadata = await ItemTokenMetadata.create(
+                    contract=item_token.contract.address,
+                    token_id=item_token.token_id,
                     name=metadata.get('name', ''),
                     description=metadata.get('description', ''),
                     artifact_uri=artifact_uri,
