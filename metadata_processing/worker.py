@@ -19,6 +19,10 @@ from metadata_processing.utils import getGridCellHash, getOrRaise
 
 IPFS_PREFIX = 'ipfs://'
 
+GLTF_MIME_TYPES = ['model/gltf-binary', 'model/gltf+json']
+IMAGE_MIME_TYPES = ['image/png', 'image/jpeg']
+ALLOWED_MIME_TYPES = GLTF_MIME_TYPES + IMAGE_MIME_TYPES
+
 
 @unique
 class MetadataType(Enum):
@@ -323,10 +327,19 @@ class MetadataProcessing:
                 mime_type = None
                 file_size = None
                 found_format = False
+                width: int | None = None
+                height: int | None = None
                 for format in getOrRaise(metadata, 'formats'):
                     if getOrRaise(format, 'uri') == artifact_uri:
                         mime_type = getOrRaise(format, 'mimeType')
                         file_size = getOrRaise(format, 'fileSize')
+                        dimensions = format.get('dimensions')
+                        if dimensions is not None:
+                            assert dimensions.unit == 'px', f"Image dimensions not in pixels: {dimensions.unit}"
+                            values = dimensions.value.split('x')
+                            assert len(values) == 2, f"Incorrect number of values in dimensions: {len(values)}"
+                            width = int(values[0])
+                            height = int(values[1])
                         found_format = True
                         break
 
@@ -334,7 +347,13 @@ class MetadataProcessing:
                 assert found_format is True, "Formats didn't include artifact"
 
                 # Validate mimeType.
-                assert mime_type in ['model/gltf-binary', 'model/gltf+json'], "Unsupported mime type"
+                assert mime_type in ALLOWED_MIME_TYPES, f"Unsupported mime type: {mime_type}"
+
+                image_frame_json: Any | None = None
+                if mime_type in IMAGE_MIME_TYPES:
+                    assert width is not None, "width is None for image"
+                    assert height is not None, "height is None for image"
+                    image_frame_json = getOrRaise(metadata, 'imageFrame')
 
                 # Split tags by comma as well. Because people are people...
                 metadata_tags: list[str] = getOrRaise(metadata, 'tags')
@@ -358,7 +377,10 @@ class MetadataProcessing:
                 if artifact_size != file_size:
                     raise Exception(f'file size does not match metadata, token_id={item_token.token_id} contract={item_token.contract.address}')
 
-                counted_polygons = count_gltf_polygons(artifact)
+                if mime_type in GLTF_MIME_TYPES:
+                    counted_polygons = count_gltf_polygons(artifact)
+                # TODO: validate width ein height in image files.
+                else: counted_polygons = 0
 
                 # Check the model doesn't have more polygons than the metadata says.
                 diff = max(0, counted_polygons - polygon_count)
@@ -393,6 +415,9 @@ class MetadataProcessing:
                     polygon_count=polygon_count,
                     mime_type=mime_type,
                     file_size=file_size,
+                    width=width,
+                    height=height,
+                    image_frame_json=image_frame_json,
                     level=item_token.level,
                     timestamp=item_token.timestamp)
 
