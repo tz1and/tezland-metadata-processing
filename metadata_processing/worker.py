@@ -335,8 +335,9 @@ class MetadataProcessing:
                         file_size = getOrRaise(format, 'fileSize')
                         dimensions = format.get('dimensions')
                         if dimensions is not None:
-                            assert dimensions.unit == 'px', f"Image dimensions not in pixels: {dimensions.unit}"
-                            values = dimensions.value.split('x')
+                            unit = getOrRaise(dimensions, 'unit')
+                            assert unit == 'px', f"Image dimensions not in pixels: {dimensions.unit}"
+                            values = getOrRaise(dimensions, 'value').split('x')
                             assert len(values) == 2, f"Incorrect number of values in dimensions: {len(values)}"
                             width = int(values[0])
                             height = int(values[1])
